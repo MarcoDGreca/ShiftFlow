@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isMember(restaurantId) {
+      return isSignedIn() && userDoc().restaurantId == restaurantId;
+    }
+    function isResponsabile(restaurantId) {
+      return isMember(restaurantId) && userDoc().role == "responsabile";
+    }
+
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /restaurants/{restaurantId} {
+      allow read: if isMember(restaurantId);
+      allow write: if isResponsabile(restaurantId);
+
+      match /staff/{uid} {
+        allow read: if isMember(restaurantId);
+        allow write: if isResponsabile(restaurantId);
+      }
+      match /shifts/{shiftId} {
+        allow read: if isMember(restaurantId);
+        allow create, update, delete: if isResponsabile(restaurantId);
+      }
+      match /leaveRequests/{requestId} {
+        allow read: if isMember(restaurantId);
+        allow create: if isMember(restaurantId)
+                       && request.resource.data.employeeUid == request.auth.uid;
+        allow update: if isResponsabile(restaurantId);
+      }
+    }
+  }
+}

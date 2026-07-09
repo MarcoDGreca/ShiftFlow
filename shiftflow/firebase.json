@@ -1,0 +1,34 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "shiftflow-emad",
+          "appId": "1:152258917260:android:37eb5f4f30ebbf8c389ca9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "shiftflow-emad",
+          "appId": "1:152258917260:ios:8c0a53ce05922de6389ca9",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "shiftflow-emad",
+          "configurations": {
+            "android": "1:152258917260:android:37eb5f4f30ebbf8c389ca9",
+            "ios": "1:152258917260:ios:8c0a53ce05922de6389ca9"
+          }
+        }
+      }
+    }
+  }
+}

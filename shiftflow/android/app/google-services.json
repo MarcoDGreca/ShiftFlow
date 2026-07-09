@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "152258917260",
+    "project_id": "shiftflow-emad",
+    "storage_bucket": "shiftflow-emad.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:152258917260:android:37eb5f4f30ebbf8c389ca9",
+        "android_client_info": {
+          "package_name": "com.example.shiftflow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBD1yZ3072nJePSFjCELOLT_WDwY0L2VNs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
