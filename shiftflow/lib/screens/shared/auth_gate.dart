@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../auth/login_screen.dart';
-import 'home_placeholder.dart';
+import 'role_home.dart';
 
 /// "Cancello" d'ingresso dell'app: guarda lo stato di [AuthProvider] e decide
 /// quale schermata mostrare. È il punto in cui login e home si scambiano
@@ -23,7 +23,7 @@ class AuthGate extends StatelessWidget {
           body: Center(child: CircularProgressIndicator()),
         );
       case AuthStatus.authenticated:
-        return const HomePlaceholder();
+        return const RoleHome();
       case AuthStatus.unauthenticated:
         return const LoginScreen();
     }

@@ -11,8 +11,8 @@ class LeaveRequestProvider extends ChangeNotifier {
 
   LeaveRequestProvider(this._leaveRequestService);
 
-  List<LeaveRequest> _requests = [];
-  bool _isLoading = false;
+  final List<LeaveRequest> _requests = [];
+  final bool _isLoading = false;
   String? _errorMessage;
 
   List<LeaveRequest> get requests => List.unmodifiable(_requests);
