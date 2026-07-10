@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/placeholder_view.dart';
 import '../shared/profile_tab.dart';
 import 'calendario_tab.dart';
+import 'personale_tab.dart';
 
 /// Home del Responsabile: guscio con barra di navigazione a quattro sezioni.
 /// Calendario, Richieste e Personale sono segnaposto per ora; Profilo è già
@@ -26,11 +27,7 @@ class _ResponsabileHomeState extends State<ResponsabileHome> {
       title: 'Richieste del personale',
       subtitle: 'Qui approverai o rifiuterai permessi e cambi turno.',
     ),
-    PlaceholderView(
-      icon: Icons.groups_outlined,
-      title: 'Personale del locale',
-      subtitle: 'Qui gestirai l\'anagrafica dei dipendenti.',
-    ),
+    PersonaleTab(),
     ProfileTab(),
   ];
 

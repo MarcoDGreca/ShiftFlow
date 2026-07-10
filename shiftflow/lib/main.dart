@@ -40,7 +40,7 @@ class ShiftFlowApp extends StatelessWidget {
           create: (_) => LeaveRequestProvider(LeaveRequestService()),
         ),
         ChangeNotifierProvider(
-          create: (_) => StaffProvider(RestaurantService()),
+          create: (_) => StaffProvider(RestaurantService(), AuthService()),
         ),
       ],
       child: MaterialApp(

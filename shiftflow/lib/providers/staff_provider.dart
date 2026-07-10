@@ -3,23 +3,30 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
+import '../services/auth_service.dart';
 import '../services/restaurant_service.dart';
 
-/// Provider dell'anagrafica personale del locale: espone alla UI l'elenco
-/// dello staff appoggiandosi a [RestaurantService].
+/// Provider dell'anagrafica personale del locale.
+///
+/// Si appoggia a due service: [RestaurantService] per elenco e rimozione,
+/// [AuthService] per l'aggiunta di un dipendente (che comporta la creazione
+/// del suo account Firebase Auth).
 class StaffProvider extends ChangeNotifier {
   final RestaurantService _restaurantService;
+  final AuthService _authService;
   StreamSubscription<List<AppUser>>? _subscription;
   String? _restaurantId;
 
-  StaffProvider(this._restaurantService);
+  StaffProvider(this._restaurantService, this._authService);
 
   List<AppUser> _staff = [];
   bool _isLoading = false;
+  bool _isSaving = false;
   String? _errorMessage;
 
   List<AppUser> get staff => List.unmodifiable(_staff);
   bool get isLoading => _isLoading;
+  bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
 
   /// Il membro dello staff con questo uid, o `null` se non presente.
@@ -54,6 +61,65 @@ class StaffProvider extends ChangeNotifier {
         notifyListeners();
       },
     );
+  }
+
+  /// Crea l'account di un nuovo dipendente e lo aggiunge all'anagrafica.
+  /// La lista si aggiorna da sola tramite lo stream.
+  Future<bool> addDipendente({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final rid = _restaurantId;
+    if (rid == null) {
+      _errorMessage = 'Nessun locale attivo.';
+      notifyListeners();
+      return false;
+    }
+    _isSaving = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _authService.createDipendente(
+        email: email,
+        password: password,
+        name: name,
+        restaurantId: rid,
+      );
+      return true;
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      return false;
+    } catch (_) {
+      _errorMessage = 'Operazione non riuscita. Riprova.';
+      return false;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  /// Rimuove un dipendente dall'anagrafica del locale.
+  Future<bool> removeDipendente(String uid) async {
+    final rid = _restaurantId;
+    if (rid == null) {
+      _errorMessage = 'Nessun locale attivo.';
+      notifyListeners();
+      return false;
+    }
+    _isSaving = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _restaurantService.removeStaff(rid, uid);
+      return true;
+    } catch (_) {
+      _errorMessage = 'Rimozione non riuscita. Riprova.';
+      return false;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
   }
 
   @override

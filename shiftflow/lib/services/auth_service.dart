@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../core/constants/app_constants.dart';
 import '../models/app_user.dart';
@@ -163,6 +164,86 @@ class AuthService {
       // Es. una scrittura Firestore rifiutata dalle regole.
       throw const AuthException('Registrazione non riuscita. Riprova.');
     }
+  }
+
+  /// Nome dell'istanza Firebase secondaria usata per creare account di terzi.
+  static const _secondaryAppName = 'staff-creation';
+
+  /// Crea l'account di un DIPENDENTE per conto del responsabile.
+  ///
+  /// Non possiamo usare la sessione principale: `createUserWithEmailAndPassword`
+  /// effettua il login del nuovo utente, e il responsabile verrebbe buttato
+  /// fuori. Usiamo quindi una seconda istanza dell'app Firebase, "usa e getta":
+  ///  - vi creiamo l'account (il login del nuovo utente avviene lì, isolato);
+  ///  - con QUELLA sessione scriviamo `users/{uid}` (le regole permettono la
+  ///    scrittura solo all'utente stesso, quindi serve proprio la sua sessione);
+  ///  - con la sessione PRINCIPALE (responsabile) scriviamo `staff/{uid}`,
+  ///    che le regole riservano al responsabile.
+  /// La sessione principale non viene mai toccata.
+  Future<void> createDipendente({
+    required String email,
+    required String password,
+    required String name,
+    required String restaurantId,
+  }) async {
+    FirebaseApp? secondaryApp;
+    try {
+      secondaryApp = await _getOrCreateSecondaryApp();
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final uid = credential.user!.uid;
+
+      // users/{uid}, scritto come il nuovo utente (sessione secondaria).
+      final appUser = AppUser(
+        uid: uid,
+        restaurantId: restaurantId,
+        role: UserRoles.dipendente,
+        name: name,
+        email: email,
+      );
+      await FirebaseFirestore.instanceFor(app: secondaryApp)
+          .collection(FirestoreCollections.users)
+          .doc(uid)
+          .set(appUser.toFirestore());
+      await secondaryAuth.signOut();
+
+      // staff/{uid}, scritto come responsabile (sessione principale).
+      await _db
+          .collection(FirestoreCollections.restaurants)
+          .doc(restaurantId)
+          .collection(FirestoreCollections.staff)
+          .doc(uid)
+          .set({
+        'name': name,
+        'email': email,
+        'role': UserRoles.dipendente,
+        // L'account è subito utilizzabile: "invitato" avrebbe senso con un
+        // vero flusso di invito via email, che richiederebbe un backend.
+        'status': StaffStatus.attivo,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(_messageFromCode(e.code));
+    } catch (_) {
+      throw const AuthException('Creazione del dipendente non riuscita.');
+    } finally {
+      await secondaryApp?.delete();
+    }
+  }
+
+  Future<FirebaseApp> _getOrCreateSecondaryApp() async {
+    // Se un tentativo precedente è stato interrotto, l'istanza può esistere
+    // ancora: riusarla evita l'errore "duplicate-app".
+    for (final app in Firebase.apps) {
+      if (app.name == _secondaryAppName) return app;
+    }
+    return Firebase.initializeApp(
+      name: _secondaryAppName,
+      options: Firebase.app().options,
+    );
   }
 
   /// Legge il documento `users/{uid}` e lo converte in [AppUser].

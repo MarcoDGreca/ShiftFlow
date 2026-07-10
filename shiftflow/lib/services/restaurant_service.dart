@@ -37,15 +37,17 @@ class RestaurantService {
         .map((snap) => snap.docs.map(AppUser.fromFirestore).toList());
   }
 
-  /// Aggiunge un membro allo staff del locale.
-  Future<void> addStaff(String restaurantId, AppUser member) async {
-    // TODO: set su restaurants/{rid}/staff/{uid} (RF8).
-    throw UnimplementedError();
-  }
+  // Nota: l'AGGIUNTA di un dipendente non è qui ma in
+  // AuthService.createDipendente, perché comporta la creazione di un account
+  // Firebase Auth (con la tecnica dell'istanza secondaria).
 
-  /// Rimuove un membro dallo staff del locale.
+  /// Rimuove un membro dall'anagrafica del locale.
+  ///
+  /// Limite noto (accettato per ora): elimina solo `staff/{uid}`. L'account
+  /// Auth e il documento `users/{uid}` del dipendente non si possono toccare
+  /// dal client di un altro utente; una rimozione completa richiederebbe un
+  /// backend (Cloud Functions + Admin SDK).
   Future<void> removeStaff(String restaurantId, String uid) async {
-    // TODO: delete su restaurants/{rid}/staff/{uid} (RF8).
-    throw UnimplementedError();
+    await _staffRef(restaurantId).doc(uid).delete();
   }
 }
