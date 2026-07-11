@@ -91,17 +91,11 @@ class ShiftFlowLogoPainter extends CustomPainter {
     final s = size.shortestSide;
 
     if (monochrome) {
-      canvas.drawPath(
-        _wave(s, -0.075, -0.075),
-        _stroke(0.055 * s)..color = monochromeColor,
-      );
-      canvas.drawPath(
-        _wave(s, 0.075, 0.075),
-        _stroke(0.055 * s)..color = monochromeColor,
-      );
+      // Silhouette pulita: solo l'onda principale, un filo più spessa.
+      // Le eco dello stesso colore si fonderebbero in una macchia.
       canvas.drawPath(
         _wave(s, 0, 0),
-        _stroke(0.15 * s)..color = monochromeColor,
+        _stroke(0.17 * s)..color = monochromeColor,
       );
       return;
     }

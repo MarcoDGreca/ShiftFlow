@@ -193,10 +193,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       if (auth.errorMessage != null) ...[
-                        Text(
-                          auth.errorMessage!,
-                          style: TextStyle(color: theme.colorScheme.error),
-                          textAlign: TextAlign.center,
+                        // liveRegion: lo screen reader annuncia l'errore
+                        // appena compare.
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            auth.errorMessage!,
+                            style: TextStyle(color: theme.colorScheme.error),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                         const SizedBox(height: AppSpacing.md),
                       ],

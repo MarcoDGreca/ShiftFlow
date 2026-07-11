@@ -20,7 +20,9 @@ class PlaceholderView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
-      child: Padding(
+      // Scrollabile: con testi ingranditi (accessibilità) il contenuto
+      // può superare lo spazio disponibile senza andare in overflow.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -60,6 +60,36 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+# Icone launcher per Android e iOS, generate dai PNG in assets/icon/
+# (a loro volta prodotti da: flutter test test/tools/render_app_icon_test.dart).
+# Per rigenerarle: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  # L'App Store rifiuta icone con trasparenza.
+  remove_alpha_ios: true
+  # Adaptive icon Android: sfondo a gradiente + logo in "safe zone" +
+  # variante monocromatica per le icone a tema di Android 13+.
+  adaptive_icon_background: "assets/icon/app_icon_bg.png"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"
+
+# Splash screen nativa (si vede prima che Flutter parta; poi il gate
+# brandizzato in auth_gate.dart prosegue la stessa grafica).
+# Per rigenerarla: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#ECFDF5"
+  color_dark: "#06241C"
+  image: "assets/icon/splash_logo.png"
+  image_dark: "assets/icon/splash_logo_dark.png"
+  # Su Android 12+ la piattaforma impone icona-su-colore.
+  android_12:
+    color: "#ECFDF5"
+    color_dark: "#06241C"
+    image: "assets/icon/splash_logo.png"
+    image_dark: "assets/icon/splash_logo_dark.png"
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
