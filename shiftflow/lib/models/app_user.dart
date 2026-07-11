@@ -1,7 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/constants/app_constants.dart';
+
 /// Rappresenta il documento `users/{uid}`, letto subito dopo il login per
-/// sapere a quale locale appartiene l'utente e con quale ruolo.
+/// sapere a quale locale appartiene l'utente e con quale ruolo. Lo stesso
+/// modello viene riusato per leggere i documenti `staff/{uid}`, che portano
+/// anche lo `status` (attivo / disattivato).
 ///
 /// I modelli conoscono `cloud_firestore` solo per convertire da/verso i
 /// documenti (`fromFirestore`/`toFirestore`). La logica di lettura/scrittura
@@ -12,6 +16,7 @@ class AppUser {
   final String role; // vedi UserRoles
   final String name;
   final String email;
+  final String status; // vedi StaffStatus
 
   const AppUser({
     required this.uid,
@@ -19,6 +24,7 @@ class AppUser {
     required this.role,
     required this.name,
     required this.email,
+    this.status = StaffStatus.attivo,
   });
 
   /// Costruisce un [AppUser] a partire dal documento Firestore.
@@ -30,6 +36,8 @@ class AppUser {
       role: data['role'] as String? ?? '',
       name: data['name'] as String? ?? '',
       email: data['email'] as String? ?? '',
+      // I vecchi documenti senza `status` sono considerati attivi.
+      status: data['status'] as String? ?? StaffStatus.attivo,
     );
   }
 
@@ -40,8 +48,11 @@ class AppUser {
         'role': role,
         'name': name,
         'email': email,
+        'status': status,
       };
 
   bool get isResponsabile => role == 'responsabile';
   bool get isDipendente => role == 'dipendente';
+  bool get isAttivo => status == StaffStatus.attivo;
+  bool get isDisattivato => status == StaffStatus.disattivato;
 }

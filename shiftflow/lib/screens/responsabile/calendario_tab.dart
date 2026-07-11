@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/placeholder_view.dart';
+import '../../widgets/sync_status_banner.dart';
 import 'shift_form_screen.dart';
 
 /// Sezione "Calendario" del Responsabile: elenco in tempo reale di tutti i
@@ -123,7 +124,15 @@ class _CalendarioTabState extends State<CalendarioTab> {
     // Scaffold annidato (senza AppBar, che è della home): serve solo per
     // ancorare il FAB a QUESTA sezione e non alle altre schede.
     return Scaffold(
-      body: body,
+      body: Column(
+        children: [
+          SyncStatusBanner(
+            isFromCache: shiftProvider.isFromCache,
+            hasPendingWrites: shiftProvider.hasPendingWrites,
+          ),
+          Expanded(child: body),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openForm,
         icon: const Icon(Icons.add),

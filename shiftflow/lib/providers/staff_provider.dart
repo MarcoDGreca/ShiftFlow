@@ -99,6 +99,29 @@ class StaffProvider extends ChangeNotifier {
     }
   }
 
+  /// Attiva o disattiva un dipendente. La lista si aggiorna da sola (stream).
+  Future<bool> setActive(String uid, {required bool active}) async {
+    final rid = _restaurantId;
+    if (rid == null) {
+      _errorMessage = 'Nessun locale attivo.';
+      notifyListeners();
+      return false;
+    }
+    _isSaving = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _restaurantService.setStaffActive(rid, uid, active: active);
+      return true;
+    } catch (_) {
+      _errorMessage = 'Operazione non riuscita. Riprova.';
+      return false;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
+  }
+
   /// Rimuove un dipendente dall'anagrafica del locale.
   Future<bool> removeDipendente(String uid) async {
     final rid = _restaurantId;

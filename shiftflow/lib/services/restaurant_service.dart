@@ -41,6 +41,21 @@ class RestaurantService {
   // AuthService.createDipendente, perché comporta la creazione di un account
   // Firebase Auth (con la tecnica dell'istanza secondaria).
 
+  /// Attiva o disattiva un membro dell'anagrafica (RF8/UC5).
+  ///
+  /// La disattivazione è "soft": il documento resta (turni e storico intatti),
+  /// ma il membro viene escluso dall'assegnazione di nuovi turni. È preferibile
+  /// alla rimozione, che è definitiva.
+  Future<void> setStaffActive(
+    String restaurantId,
+    String uid, {
+    required bool active,
+  }) async {
+    await _staffRef(restaurantId).doc(uid).update({
+      'status': active ? StaffStatus.attivo : StaffStatus.disattivato,
+    });
+  }
+
   /// Rimuove un membro dall'anagrafica del locale.
   ///
   /// Limite noto (accettato per ora): elimina solo `staff/{uid}`. L'account

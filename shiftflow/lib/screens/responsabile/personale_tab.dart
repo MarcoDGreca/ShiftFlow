@@ -62,6 +62,45 @@ class _PersonaleTabState extends State<PersonaleTab> {
     }
   }
 
+  Future<void> _setActive(AppUser member, {required bool active}) async {
+    final provider = context.read<StaffProvider>();
+    final ok = await provider.setActive(member.uid, active: active);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? (active
+                ? '${member.name} riattivato.'
+                : '${member.name} disattivato.')
+            : (provider.errorMessage ?? 'Operazione non riuscita.')),
+      ),
+    );
+  }
+
+  /// Menù azioni su un dipendente: disattiva/riattiva e rimuovi.
+  Widget _memberMenu(AppUser member) {
+    return PopupMenuButton<String>(
+      tooltip: 'Azioni',
+      onSelected: (value) {
+        if (value == 'toggle') {
+          _setActive(member, active: member.isDisattivato);
+        } else if (value == 'remove') {
+          _confirmRemove(member);
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'toggle',
+          child: Text(member.isDisattivato ? 'Riattiva' : 'Disattiva'),
+        ),
+        const PopupMenuItem(
+          value: 'remove',
+          child: Text('Rimuovi dal locale'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final staffProvider = context.watch<StaffProvider>();
@@ -85,19 +124,18 @@ class _PersonaleTabState extends State<PersonaleTab> {
         itemBuilder: (context, i) {
           final member = staff[i];
           // Il titolare (e l'utente stesso) non si possono rimuovere da qui.
-          final removable =
+          final manageable =
               !member.isResponsabile && member.uid != currentUid;
+          final subtitle = member.isDisattivato
+              ? '${member.email} · Disattivato'
+              : member.email;
           return Card(
             child: ListTile(
               leading: InitialsAvatar(name: member.name),
               title: Text(member.name),
-              subtitle: Text(member.email),
-              trailing: removable
-                  ? IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      tooltip: 'Rimuovi dal locale',
-                      onPressed: () => _confirmRemove(member),
-                    )
+              subtitle: Text(subtitle),
+              trailing: manageable
+                  ? _memberMenu(member)
                   : Chip(
                       label: Text(
                         member.isResponsabile ? 'Titolare' : 'Tu',

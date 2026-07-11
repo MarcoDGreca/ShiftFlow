@@ -11,6 +11,7 @@ import 'providers/staff_provider.dart';
 import 'screens/shared/auth_gate.dart';
 import 'services/auth_service.dart';
 import 'services/leave_request_service.dart';
+import 'services/notification_service.dart';
 import 'services/restaurant_service.dart';
 import 'services/shift_service.dart';
 
@@ -21,6 +22,8 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  // Handler delle notifiche in background: va registrato prima di runApp.
+  NotificationService.registerBackgroundHandler();
   runApp(const ShiftFlowApp());
 }
 
@@ -34,7 +37,9 @@ class ShiftFlowApp extends StatelessWidget {
     // vedono solo i Provider e non toccano mai direttamente i Service/Firebase.
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider(AuthService())),
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(AuthService(), NotificationService()),
+        ),
         ChangeNotifierProvider(create: (_) => ShiftProvider(ShiftService())),
         ChangeNotifierProvider(
           create: (_) => LeaveRequestProvider(LeaveRequestService()),

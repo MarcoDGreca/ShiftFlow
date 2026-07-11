@@ -13,7 +13,7 @@ import '../services/shift_service.dart';
 /// lista aggiornata e la UI si ridisegna da sola.
 class ShiftProvider extends ChangeNotifier {
   final ShiftService _shiftService;
-  StreamSubscription<List<Shift>>? _subscription;
+  StreamSubscription<ShiftsView>? _subscription;
 
   /// Chiave della sottoscrizione attiva (per non risottoscrivere inutilmente
   /// alla stessa sorgente a ogni rebuild della UI).
@@ -28,11 +28,28 @@ class ShiftProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSaving = false;
   String? _errorMessage;
+  bool _isFromCache = false;
+  bool _hasPendingWrites = false;
 
   List<Shift> get shifts => List.unmodifiable(_shifts);
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
+
+  /// I turni mostrati arrivano dalla cache locale (tipicamente offline).
+  bool get isFromCache => _isFromCache;
+
+  /// Ci sono scritture locali non ancora sincronizzate col server (§7.1).
+  bool get hasPendingWrites => _hasPendingWrites;
+
+  /// Il turno con questo id, o `null` se non presente tra quelli caricati.
+  /// Usato per mostrare il turno collegato a una richiesta di cambio.
+  Shift? byId(String id) {
+    for (final shift in _shifts) {
+      if (shift.id == id) return shift;
+    }
+    return null;
+  }
 
   /// Inizia ad ascoltare tutti i turni del locale (vista Responsabile).
   void listenForRestaurant(String restaurantId) {
@@ -49,7 +66,7 @@ class ShiftProvider extends ChangeNotifier {
   void _listen(
     String key,
     String restaurantId,
-    Stream<List<Shift>> Function() source,
+    Stream<ShiftsView> Function() source,
   ) {
     // Già in ascolto sulla stessa sorgente: niente da fare.
     if (_subscription != null && _watchKey == key) return;
@@ -62,8 +79,10 @@ class ShiftProvider extends ChangeNotifier {
     notifyListeners();
 
     _subscription = source().listen(
-      (shifts) {
-        _shifts = shifts;
+      (view) {
+        _shifts = view.shifts;
+        _isFromCache = view.isFromCache;
+        _hasPendingWrites = view.hasPendingWrites;
         _isLoading = false;
         notifyListeners();
       },
@@ -87,6 +106,21 @@ class ShiftProvider extends ChangeNotifier {
 
   Future<bool> deleteShift(String shiftId) =>
       _mutate((rid) => _shiftService.deleteShift(rid, shiftId));
+
+  /// Cerca una sovrapposizione per il turno indicato (§7.3). Sola lettura:
+  /// restituisce il turno in conflitto o `null`. Non modifica lo stato.
+  Future<Shift?> findOverlap(Shift shift) async {
+    final rid = _restaurantId;
+    if (rid == null) return null;
+    return _shiftService.findOverlapping(
+      rid,
+      employeeUid: shift.employeeUid,
+      date: shift.date,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      excludeShiftId: shift.id.isEmpty ? null : shift.id,
+    );
+  }
 
   /// Esegue una scrittura gestendo in un punto solo stato di salvataggio ed
   /// errori. La lista NON va aggiornata a mano: ci pensa lo stream.

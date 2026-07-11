@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 
 /// Stato di autenticazione, usato dalla UI per decidere cosa mostrare.
 /// `unknown` = non sappiamo ancora (all'avvio, prima del primo evento).
@@ -17,9 +18,14 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 /// [signIn]/[signOut]; non toccano mai [AuthService] direttamente.
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
+  final NotificationService _notificationService;
   StreamSubscription<AppUser?>? _subscription;
 
-  AuthProvider(this._authService) {
+  /// uid per cui abbiamo già configurato le notifiche (evita di rifarlo a
+  /// ogni emissione dello stream).
+  String? _fcmUid;
+
+  AuthProvider(this._authService, this._notificationService) {
     // Ci mettiamo in ascolto: a ogni login/logout (anche al riavvio dell'app,
     // perché Firebase mantiene la sessione) aggiorniamo lo stato.
     _subscription = _authService.userChanges().listen(_onUserChanged);
@@ -41,6 +47,15 @@ class AuthProvider extends ChangeNotifier {
     _status =
         user == null ? AuthStatus.unauthenticated : AuthStatus.authenticated;
     notifyListeners();
+
+    // Configura le notifiche una volta per utente. Operazione di rete "best
+    // effort": non attendiamo né blocchiamo lo stato dell'auth su di essa.
+    if (user != null && user.uid != _fcmUid) {
+      _fcmUid = user.uid;
+      unawaited(_notificationService.setUpForUser(user.uid));
+    } else if (user == null) {
+      _fcmUid = null;
+    }
   }
 
   /// Esegue il login. Aggiorna `isSubmitting`/`errorMessage`; l'esito positivo
@@ -101,7 +116,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> signOut() => _authService.signOut();
+  Future<void> signOut() async {
+    // Rimuoviamo il token FINCHÉ siamo ancora autenticati (le regole
+    // permettono la scrittura solo sul proprio documento).
+    final uid = _currentUser?.uid;
+    if (uid != null) {
+      await _notificationService.removeTokenForUser(uid);
+    }
+    await _authService.signOut();
+  }
 
   @override
   void dispose() {

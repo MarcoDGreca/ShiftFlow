@@ -13,7 +13,16 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read:   if isSignedIn() && request.auth.uid == uid;
+      // creazione del proprio profilo in fase di registrazione
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      // l'utente può aggiornare il proprio documento, ma NON ruolo e ristorante:
+      // sono la base dell'autorizzazione, non deve potersi auto-promuovere né
+      // spostarsi in un altro locale.
+      allow update: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.restaurantId == resource.data.restaurantId;
+      allow delete: if false;
     }
 
     match /restaurants/{restaurantId} {
@@ -32,7 +41,13 @@ service cloud.firestore {
         allow read: if isMember(restaurantId);
         allow create: if isMember(restaurantId)
                        && request.resource.data.employeeUid == request.auth.uid;
-        allow update: if isResponsabile(restaurantId);
+        // Il responsabile decide (approva/rifiuta). Il dipendente può SOLO
+        // annullare la PROPRIA richiesta, e solo finché è ancora "in attesa".
+        allow update: if isResponsabile(restaurantId)
+                       || (isMember(restaurantId)
+                           && resource.data.employeeUid == request.auth.uid
+                           && resource.data.status == "in_attesa"
+                           && request.resource.data.status == "annullata");
       }
     }
   }

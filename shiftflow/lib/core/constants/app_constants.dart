@@ -30,6 +30,7 @@ class StaffStatus {
 
   static const String invitato = 'invitato';
   static const String attivo = 'attivo';
+  static const String disattivato = 'disattivato'; // non riceve nuovi turni
 }
 
 /// Tipo di richiesta inviata da un dipendente.
@@ -47,4 +48,5 @@ class LeaveStatus {
   static const String inAttesa = 'in_attesa';
   static const String approvata = 'approvata';
   static const String rifiutata = 'rifiutata';
+  static const String annullata = 'annullata'; // ritirata dal dipendente
 }

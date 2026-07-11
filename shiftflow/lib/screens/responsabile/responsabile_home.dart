@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../widgets/placeholder_view.dart';
+import '../../providers/leave_request_provider.dart';
 import '../shared/profile_tab.dart';
 import 'calendario_tab.dart';
 import 'personale_tab.dart';
+import 'richieste_tab.dart';
 
-/// Home del Responsabile: guscio con barra di navigazione a quattro sezioni.
-/// Calendario, Richieste e Personale sono segnaposto per ora; Profilo è già
-/// funzionante. Le sezioni verranno riempite nei prossimi passi.
+/// Home del Responsabile: guscio con barra di navigazione a quattro sezioni
+/// (Calendario, Richieste, Personale, Profilo), tutte funzionanti.
 class ResponsabileHome extends StatefulWidget {
   const ResponsabileHome({super.key});
 
@@ -22,40 +23,48 @@ class _ResponsabileHomeState extends State<ResponsabileHome> {
 
   static const _pages = [
     CalendarioTab(),
-    PlaceholderView(
-      icon: Icons.inbox_outlined,
-      title: 'Richieste del personale',
-      subtitle: 'Qui approverai o rifiuterai permessi e cambi turno.',
-    ),
+    RichiesteResponsabileTab(),
     PersonaleTab(),
     ProfileTab(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    // Numero di richieste in attesa: alimenta il badge sulla scheda Richieste.
+    final pending = context.watch<LeaveRequestProvider>().pendingCount;
+
     return Scaffold(
       appBar: AppBar(title: Text(_titles[_index])),
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Calendario',
           ),
           NavigationDestination(
-            icon: Icon(Icons.inbox_outlined),
-            selectedIcon: Icon(Icons.inbox),
+            // Badge.count mostra il pallino col numero solo se ci sono pendenti.
+            icon: Badge.count(
+              count: pending,
+              isLabelVisible: pending > 0,
+              child: const Icon(Icons.inbox_outlined),
+            ),
+            selectedIcon: Badge.count(
+              count: pending,
+              isLabelVisible: pending > 0,
+              child: const Icon(Icons.inbox),
+            ),
             label: 'Richieste',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.groups_outlined),
             selectedIcon: Icon(Icons.groups),
             label: 'Personale',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profilo',

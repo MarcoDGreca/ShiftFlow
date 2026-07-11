@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../widgets/placeholder_view.dart';
 import '../shared/profile_tab.dart';
+import 'richieste_tab.dart';
+import 'turni_tab.dart';
 
 /// Home del Dipendente: un guscio con la barra di navigazione in basso e tre
-/// sezioni. Per ora "I miei turni" e "Richieste" sono segnaposto; le
-/// riempiremo nei prossimi passi. "Profilo" è già funzionante.
+/// sezioni (I miei turni, Le mie richieste, Profilo).
 ///
 /// È uno `StatefulWidget` perché deve ricordare quale scheda è selezionata.
 class DipendenteHome extends StatefulWidget {
@@ -23,16 +23,8 @@ class _DipendenteHomeState extends State<DipendenteHome> {
   // IndexedStack tiene "vive" tutte le schede e mostra solo quella scelta,
   // così cambiando tab non si perde il loro stato.
   static const _pages = [
-    PlaceholderView(
-      icon: Icons.event_note,
-      title: 'I tuoi turni',
-      subtitle: 'Qui vedrai i turni che il responsabile ti assegna.',
-    ),
-    PlaceholderView(
-      icon: Icons.mail_outline,
-      title: 'Le tue richieste',
-      subtitle: 'Qui potrai chiedere permessi o cambi turno e vederne lo stato.',
-    ),
+    TurniTab(),
+    RichiesteTab(),
     ProfileTab(),
   ];
 

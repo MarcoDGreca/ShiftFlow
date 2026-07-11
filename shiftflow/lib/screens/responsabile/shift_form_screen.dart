@@ -93,6 +93,18 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
 
+    // Validazione bloccante (§7.4): la fine deve venire dopo l'inizio.
+    final startMinutes = _start!.hour * 60 + _start!.minute;
+    final endMinutes = _end!.hour * 60 + _end!.minute;
+    if (endMinutes <= startMinutes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("L'ora di fine deve essere successiva all'inizio."),
+        ),
+      );
+      return;
+    }
+
     final currentUser = context.read<AuthProvider>().currentUser;
     if (currentUser == null) return;
 
@@ -110,6 +122,15 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     );
 
     final provider = context.read<ShiftProvider>();
+
+    // Segnalazione sovrapposizione (§7.3): avvisa, ma la scelta è del responsabile.
+    final overlap = await provider.findOverlap(shift);
+    if (!mounted) return;
+    if (overlap != null) {
+      final proceed = await _confirmOverlap(overlap);
+      if (proceed != true || !mounted) return;
+    }
+
     final ok = _isEditing
         ? await provider.updateShift(shift)
         : await provider.createShift(shift);
@@ -124,15 +145,49 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     }
   }
 
+  /// Chiede conferma quando il nuovo turno si sovrappone a un altro dello
+  /// stesso dipendente (§7.3).
+  Future<bool?> _confirmOverlap(Shift other) {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Turni sovrapposti'),
+        content: Text(
+          'Il dipendente ha già un turno che si sovrappone:\n'
+          '${DateFormatter.full(other.date)} · '
+          '${other.startTime}–${other.endTime}.\n\n'
+          'Vuoi salvarlo comunque?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Salva comunque'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final staff = context.watch<StaffProvider>().staff;
     final isSaving = context.watch<ShiftProvider>().isSaving;
 
+    // Ai nuovi turni si assegnano solo dipendenti attivi; se stiamo MODIFICANDO
+    // un turno di qualcuno nel frattempo disattivato, lo teniamo comunque
+    // selezionabile per non perderne l'assegnazione.
+    final selectable = staff
+        .where((m) => m.isAttivo || m.uid == _employeeUid)
+        .toList();
+
     // Difensivo: se il turno è di qualcuno non più in anagrafica, il valore
     // non comparirebbe tra le voci del dropdown e Flutter andrebbe in errore.
     final employeeValue =
-        staff.any((m) => m.uid == _employeeUid) ? _employeeUid : null;
+        selectable.any((m) => m.uid == _employeeUid) ? _employeeUid : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -153,10 +208,12 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  for (final member in staff)
+                  for (final member in selectable)
                     DropdownMenuItem(
                       value: member.uid,
-                      child: Text(member.name),
+                      child: Text(member.isDisattivato
+                          ? '${member.name} (disattivato)'
+                          : member.name),
                     ),
                 ],
                 onChanged: (uid) => setState(() => _employeeUid = uid),
