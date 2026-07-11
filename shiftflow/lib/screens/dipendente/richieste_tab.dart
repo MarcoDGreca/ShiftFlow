@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/utils/dialogs.dart';
 import '../../models/leave_request.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
-import '../../widgets/leave_request_card.dart';
-import '../../widgets/placeholder_view.dart';
+import '../../widgets/requests_list_view.dart';
 import 'new_request_screen.dart';
 
 /// Sezione "Le mie richieste" del Dipendente: elenco delle proprie richieste
@@ -23,16 +24,23 @@ class _RichiesteTabState extends State<RichiesteTab> {
   @override
   void initState() {
     super.initState();
-    final user = context.read<AuthProvider>().currentUser;
-    if (user != null) {
-      context
-          .read<LeaveRequestProvider>()
-          .listenForEmployee(user.restaurantId, user.uid);
-      // Serve per il turno collegato (elenco nel form e dettaglio nelle card).
-      context
-          .read<ShiftProvider>()
-          .listenForEmployee(user.restaurantId, user.uid);
-    }
+    // A fine frame: il provider fa notifyListeners() subito, e farlo durante
+    // la costruzione del widget non è permesso.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = context.read<AuthProvider>().currentUser;
+      if (user != null) {
+        context.read<LeaveRequestProvider>().listenForEmployee(
+          user.restaurantId,
+          user.uid,
+        );
+        // Serve per il turno collegato (elenco nel form e dettaglio nelle card).
+        context.read<ShiftProvider>().listenForEmployee(
+          user.restaurantId,
+          user.uid,
+        );
+      }
+    });
   }
 
   /// Pulsante "Annulla richiesta", disabilitato durante un salvataggio in corso.
@@ -40,43 +48,37 @@ class _RichiesteTabState extends State<RichiesteTab> {
     final isSaving = context.watch<LeaveRequestProvider>().isSaving;
     return OutlinedButton.icon(
       onPressed: isSaving ? null : () => _cancel(request),
-      icon: const Icon(Icons.undo),
+      icon: const Icon(Icons.undo_rounded),
       label: const Text('Annulla richiesta'),
     );
   }
 
   Future<void> _cancel(LeaveRequest request) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Annullare la richiesta?'),
-        content: const Text(
-            'La richiesta verrà ritirata e il responsabile non la vedrà più '
-            'tra quelle da gestire.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sì, annulla'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Annullare la richiesta?',
+      message:
+          'La richiesta verrà ritirata e il responsabile non la vedrà '
+          'più tra quelle da gestire.',
+      confirmLabel: 'Sì, annulla',
+      cancelLabel: 'No',
     );
-    if (!mounted || confirmed != true) return;
+    if (!mounted || !confirmed) return;
 
     final auth = context.read<AuthProvider>();
     final provider = context.read<LeaveRequestProvider>();
-    final ok =
-        await provider.cancel(request.id, employeeUid: auth.currentUser!.uid);
+    final ok = await provider.cancel(
+      request.id,
+      employeeUid: auth.currentUser!.uid,
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? 'Richiesta annullata.'
-            : (provider.errorMessage ?? 'Operazione non riuscita.')),
+        content: Text(
+          ok
+              ? 'Richiesta annullata.'
+              : (provider.errorMessage ?? 'Operazione non riuscita.'),
+        ),
       ),
     );
   }
@@ -86,50 +88,40 @@ class _RichiesteTabState extends State<RichiesteTab> {
     final provider = context.watch<LeaveRequestProvider>();
     final shiftProvider = context.watch<ShiftProvider>();
 
-    final Widget body;
-    if (provider.isLoading) {
-      body = const Center(child: CircularProgressIndicator());
-    } else if (provider.errorMessage != null && provider.requests.isEmpty) {
-      body = PlaceholderView(
-        icon: Icons.error_outline,
-        title: 'Qualcosa è andato storto',
-        subtitle: provider.errorMessage!,
-      );
-    } else if (provider.requests.isEmpty) {
-      body = const PlaceholderView(
-        icon: Icons.mail_outline,
-        title: 'Nessuna richiesta',
-        subtitle: 'Invia la tua prima richiesta con il pulsante + qui sotto.',
-      );
-    } else {
-      final requests = provider.requests;
-      body = ListView.builder(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 88),
-        itemCount: requests.length,
-        itemBuilder: (context, i) {
-          final request = requests[i];
-          final isPending = request.status == LeaveStatus.inAttesa;
-          return LeaveRequestCard(
-            request: request,
-            relatedShift: request.relatedShiftId == null
-                ? null
-                : shiftProvider.byId(request.relatedShiftId!),
-            actions: isPending ? _buildCancelAction(request) : null,
-          );
-        },
-      );
-    }
-
+    // Scaffold annidato (senza AppBar, che è della home): serve solo per
+    // ancorare il FAB a QUESTA sezione. Trasparente per lasciar vedere
+    // lo sfondo ambientale della home.
     return Scaffold(
-      body: body,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const NewRequestScreen()),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Nuova richiesta'),
+      backgroundColor: Colors.transparent,
+      body: RequestsListView(
+        isLoading: provider.isLoading,
+        errorMessage: provider.errorMessage,
+        requests: provider.requests,
+        emptyIcon: Icons.mail_outline_rounded,
+        emptyTitle: 'Nessuna richiesta',
+        emptySubtitle:
+            'Invia la tua prima richiesta con il pulsante + qui sotto.',
+        relatedShiftFor: (request) => request.relatedShiftId == null
+            ? null
+            : shiftProvider.byId(request.relatedShiftId!),
+        actionsFor: (request) => request.status == LeaveStatus.inAttesa
+            ? _buildCancelAction(request)
+            : null,
+        bottomClearance: AppSizes.fabClearance,
+      ),
+      // Il Padding alza il FAB sopra la NavigationBar trasparente della home
+      // (lo Scaffold interno non sa quanto è alta: glielo diciamo noi).
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+        child: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const NewRequestScreen()));
+          },
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Nuova richiesta'),
+        ),
       ),
     );
   }

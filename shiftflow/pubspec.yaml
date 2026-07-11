@@ -39,10 +39,19 @@ dependencies:
   cloud_firestore: ^6.6.0
   firebase_messaging: ^16.4.1
   provider: ^6.1.5+1
+  # Font Manrope scaricato/gestito automaticamente (tipografia del redesign).
+  google_fonts: ^6.3.0
+  # Calendario mensile per la tab Calendario del responsabile.
+  table_calendar: ^3.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # Generano rispettivamente le icone launcher e la splash screen nativa
+  # a partire dai PNG in assets/icon/ (vedi config in fondo al file).
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

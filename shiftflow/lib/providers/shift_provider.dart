@@ -51,16 +51,36 @@ class ShiftProvider extends ChangeNotifier {
     return null;
   }
 
+  /// I turni che cadono nel giorno indicato (si confrontano solo
+  /// anno/mese/giorno). Usato dal calendario mensile come `eventLoader`
+  /// e per la lista del giorno selezionato.
+  List<Shift> shiftsOn(DateTime day) {
+    return _shifts
+        .where(
+          (s) =>
+              s.date.year == day.year &&
+              s.date.month == day.month &&
+              s.date.day == day.day,
+        )
+        .toList();
+  }
+
   /// Inizia ad ascoltare tutti i turni del locale (vista Responsabile).
   void listenForRestaurant(String restaurantId) {
-    _listen('all|$restaurantId', restaurantId,
-        () => _shiftService.watchAllShifts(restaurantId));
+    _listen(
+      'all|$restaurantId',
+      restaurantId,
+      () => _shiftService.watchAllShifts(restaurantId),
+    );
   }
 
   /// Inizia ad ascoltare i turni del dipendente indicato (vista Dipendente).
   void listenForEmployee(String restaurantId, String employeeUid) {
-    _listen('emp|$restaurantId|$employeeUid', restaurantId,
-        () => _shiftService.watchShiftsForEmployee(restaurantId, employeeUid));
+    _listen(
+      'emp|$restaurantId|$employeeUid',
+      restaurantId,
+      () => _shiftService.watchShiftsForEmployee(restaurantId, employeeUid),
+    );
   }
 
   void _listen(

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/branding/shiftflow_logo.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/app_background.dart';
+import '../../widgets/glass_container.dart';
 import 'register_screen.dart';
 
 /// Schermata di login (email + password).
@@ -21,6 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -38,9 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // context.read: chiamiamo un metodo senza doverci "iscrivere" ai cambi.
     await context.read<AuthProvider>().signIn(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
   }
 
   @override
@@ -48,89 +53,137 @@ class _LoginScreenState extends State<LoginScreen> {
     // context.watch: qui invece ci ISCRIVIAMO, così il bottone/errore si
     // ridisegnano quando cambiano isSubmitting o errorMessage.
     final auth = context.watch<AuthProvider>();
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ShiftFlow')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(Icons.restaurant_menu, size: 64),
-                const SizedBox(height: 8),
-                Text(
-                  'Accedi',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: Validators.email,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true, // nasconde i caratteri
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _submit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: Validators.password,
-                ),
-                const SizedBox(height: 16),
-                if (auth.errorMessage != null) ...[
-                  Text(
-                    auth.errorMessage!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+      body: AppBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: AppSpacing.screenPadding,
+              child: ConstrainedBox(
+                // Su schermi larghi (tablet) il form non si allarga a nastro.
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const ShiftFlowLogo(size: 96),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'ShiftFlow',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineMedium,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                FilledButton(
-                  // Bottone disabilitato mentre il login è in corso.
-                  onPressed: auth.isSubmitting ? null : _submit,
-                  child: auth.isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Accedi'),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  // Disabilitato durante un login in corso.
-                  onPressed: auth.isSubmitting
-                      ? null
-                      : () {
-                          // Puliamo eventuali errori prima di cambiare schermata.
-                          context.read<AuthProvider>().clearError();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const RegisterScreen(),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'I turni del tuo locale, che scorrono da soli',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    GlassContainer(
+                      blur: true,
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(AppRadius.xl),
+                      ),
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text('Accedi', style: theme.textTheme.titleLarge),
+                            const SizedBox(height: AppSpacing.md),
+                            TextFormField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.email],
+                              decoration: const InputDecoration(
+                                labelText: 'Email',
+                                prefixIcon: Icon(Icons.email_outlined),
+                              ),
+                              validator: Validators.email,
                             ),
-                          );
-                        },
-                  child: const Text('Non hai un account? Registra il tuo locale'),
+                            const SizedBox(height: AppSpacing.md),
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: !_showPassword,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) => _submit(),
+                              autofillHints: const [AutofillHints.password],
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  tooltip: _showPassword
+                                      ? 'Nascondi password'
+                                      : 'Mostra password',
+                                  icon: Icon(
+                                    _showPassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _showPassword = !_showPassword,
+                                  ),
+                                ),
+                              ),
+                              validator: Validators.password,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            if (auth.errorMessage != null) ...[
+                              Text(
+                                auth.errorMessage!,
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                            ],
+                            FilledButton(
+                              // Bottone disabilitato mentre il login è in corso.
+                              onPressed: auth.isSubmitting ? null : _submit,
+                              child: auth.isSubmitting
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Accedi'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextButton(
+                      // Disabilitato durante un login in corso.
+                      onPressed: auth.isSubmitting
+                          ? null
+                          : () {
+                              // Puliamo eventuali errori prima di cambiare schermata.
+                              context.read<AuthProvider>().clearError();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              );
+                            },
+                      child: const Text(
+                        'Non hai un account? Registra il tuo locale',
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

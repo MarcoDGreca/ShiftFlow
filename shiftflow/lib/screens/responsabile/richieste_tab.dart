@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_status_colors.dart';
 import '../../models/leave_request.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
-import '../../widgets/leave_request_card.dart';
-import '../../widgets/placeholder_view.dart';
+import '../../widgets/requests_list_view.dart';
 
 /// Sezione "Richieste" del Responsabile: coda di tutte le richieste del locale.
 /// Su quelle in attesa mostra i pulsanti Approva/Rifiuta; le altre mostrano
@@ -25,14 +26,19 @@ class _RichiesteResponsabileTabState extends State<RichiesteResponsabileTab> {
   @override
   void initState() {
     super.initState();
-    final user = context.read<AuthProvider>().currentUser;
-    if (user != null) {
-      final rid = user.restaurantId;
-      // Sottoscrizioni idempotenti: richieste + staff (nomi) + turni (dettaglio).
-      context.read<LeaveRequestProvider>().listenForRestaurant(rid);
-      context.read<StaffProvider>().listenForRestaurant(rid);
-      context.read<ShiftProvider>().listenForRestaurant(rid);
-    }
+    // A fine frame: il provider fa notifyListeners() subito, e farlo durante
+    // la costruzione del widget non è permesso.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = context.read<AuthProvider>().currentUser;
+      if (user != null) {
+        final rid = user.restaurantId;
+        // Sottoscrizioni idempotenti: richieste + staff (nomi) + turni (dettaglio).
+        context.read<LeaveRequestProvider>().listenForRestaurant(rid);
+        context.read<StaffProvider>().listenForRestaurant(rid);
+        context.read<ShiftProvider>().listenForRestaurant(rid);
+      }
+    });
   }
 
   Future<void> _resolve(LeaveRequest request, {required bool approved}) async {
@@ -46,9 +52,11 @@ class _RichiesteResponsabileTabState extends State<RichiesteResponsabileTab> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? (approved ? 'Richiesta approvata.' : 'Richiesta rifiutata.')
-            : (provider.errorMessage ?? 'Operazione non riuscita.')),
+        content: Text(
+          ok
+              ? (approved ? 'Richiesta approvata.' : 'Richiesta rifiutata.')
+              : (provider.errorMessage ?? 'Operazione non riuscita.'),
+        ),
       ),
     );
   }
@@ -59,60 +67,49 @@ class _RichiesteResponsabileTabState extends State<RichiesteResponsabileTab> {
     final staffProvider = context.watch<StaffProvider>();
     final shiftProvider = context.watch<ShiftProvider>();
 
-    if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (provider.errorMessage != null && provider.requests.isEmpty) {
-      return PlaceholderView(
-        icon: Icons.error_outline,
-        title: 'Qualcosa è andato storto',
-        subtitle: provider.errorMessage!,
-      );
-    }
-    if (provider.requests.isEmpty) {
-      return const PlaceholderView(
-        icon: Icons.inbox_outlined,
-        title: 'Nessuna richiesta',
-        subtitle: 'Le richieste inviate dai dipendenti compariranno qui.',
-      );
-    }
-
-    final requests = provider.requests;
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: requests.length,
-      itemBuilder: (context, i) {
-        final request = requests[i];
-        final isPending = request.status == LeaveStatus.inAttesa;
-        return LeaveRequestCard(
-          request: request,
-          employeeName:
-              staffProvider.byUid(request.employeeUid)?.name ?? 'Dipendente',
-          relatedShift: request.relatedShiftId == null
-              ? null
-              : shiftProvider.byId(request.relatedShiftId!),
-          actions: isPending ? _buildActions(request) : null,
-        );
-      },
+    return RequestsListView(
+      isLoading: provider.isLoading,
+      errorMessage: provider.errorMessage,
+      requests: provider.requests,
+      emptyIcon: Icons.inbox_rounded,
+      emptyTitle: 'Nessuna richiesta',
+      emptySubtitle: 'Le richieste inviate dai dipendenti compariranno qui.',
+      employeeNameFor: (request) =>
+          staffProvider.byUid(request.employeeUid)?.name ?? 'Dipendente',
+      relatedShiftFor: (request) => request.relatedShiftId == null
+          ? null
+          : shiftProvider.byId(request.relatedShiftId!),
+      actionsFor: (request) => request.status == LeaveStatus.inAttesa
+          ? _buildActions(request)
+          : null,
     );
   }
 
   Widget _buildActions(LeaveRequest request) {
     // Disabilitiamo i pulsanti durante un salvataggio in corso.
     final isSaving = context.watch<LeaveRequestProvider>().isSaving;
+    final theme = Theme.of(context);
+    final statusColors = theme.statusColors;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         OutlinedButton.icon(
-          onPressed:
-              isSaving ? null : () => _resolve(request, approved: false),
-          icon: const Icon(Icons.close),
+          style: OutlinedButton.styleFrom(foregroundColor: statusColors.danger),
+          onPressed: isSaving ? null : () => _resolve(request, approved: false),
+          icon: const Icon(Icons.close_rounded),
           label: const Text('Rifiuta'),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.sm),
         FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: statusColors.success,
+            // In dark mode il verde è chiaro: serve testo scuro per leggerlo.
+            foregroundColor: isDark ? const Color(0xFF04382B) : Colors.white,
+          ),
           onPressed: isSaving ? null : () => _resolve(request, approved: true),
-          icon: const Icon(Icons.check),
+          icon: const Icon(Icons.check_rounded),
           label: const Text('Approva'),
         ),
       ],

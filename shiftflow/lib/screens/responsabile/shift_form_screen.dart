@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/app_spacing.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/utils/dialogs.dart';
 import '../../models/shift.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
+import '../../widgets/app_background.dart';
+import '../../widgets/glass_container.dart';
 
 /// Form di creazione/modifica di un turno.
 ///
 /// Se [existing] è `null` crea un nuovo turno, altrimenti modifica quello
-/// passato (campi precompilati). Al salvataggio chiama [ShiftProvider] e,
-/// se l'operazione riesce, torna alla lista: la card comparirà o si
-/// aggiornerà da sola grazie allo stream.
+/// passato (campi precompilati). [initialDate] pre-compila la data di un
+/// turno nuovo (es. il giorno selezionato sul calendario). Al salvataggio
+/// chiama [ShiftProvider] e, se l'operazione riesce, torna alla lista: la
+/// card comparirà o si aggiornerà da sola grazie allo stream.
 class ShiftFormScreen extends StatefulWidget {
   final Shift? existing;
+  final DateTime? initialDate;
 
-  const ShiftFormScreen({super.key, this.existing});
+  const ShiftFormScreen({super.key, this.existing, this.initialDate});
 
   @override
   State<ShiftFormScreen> createState() => _ShiftFormScreenState();
@@ -43,6 +49,11 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
       _start = _parseTime(existing.startTime);
       _end = _parseTime(existing.endTime);
       _notesController.text = existing.notes ?? '';
+    } else if (widget.initialDate != null) {
+      // Turno nuovo dal calendario: data già impostata al giorno selezionato
+      // (normalizzata a mezzanotte: dell'orario si occupano Inizio/Fine).
+      final d = widget.initialDate!;
+      _date = DateTime(d.year, d.month, d.day);
     }
   }
 
@@ -81,8 +92,8 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
   Future<void> _pickTime({required bool isStart}) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: (isStart ? _start : _end) ??
-          const TimeOfDay(hour: 18, minute: 0),
+      initialTime:
+          (isStart ? _start : _end) ?? const TimeOfDay(hour: 18, minute: 0),
     );
     if (picked != null) {
       setState(() => isStart ? _start = picked : _end = picked);
@@ -128,7 +139,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     if (!mounted) return;
     if (overlap != null) {
       final proceed = await _confirmOverlap(overlap);
-      if (proceed != true || !mounted) return;
+      if (!proceed || !mounted) return;
     }
 
     final ok = _isEditing
@@ -147,28 +158,17 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
 
   /// Chiede conferma quando il nuovo turno si sovrappone a un altro dello
   /// stesso dipendente (§7.3).
-  Future<bool?> _confirmOverlap(Shift other) {
-    return showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Turni sovrapposti'),
-        content: Text(
+  Future<bool> _confirmOverlap(Shift other) {
+    return showAppConfirmDialog(
+      context,
+      title: 'Turni sovrapposti',
+      message:
           'Il dipendente ha già un turno che si sovrappone:\n'
           '${DateFormatter.full(other.date)} · '
           '${other.startTime}–${other.endTime}.\n\n'
           'Vuoi salvarlo comunque?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('No'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Salva comunque'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Salva comunque',
+      cancelLabel: 'No',
     );
   }
 
@@ -186,116 +186,152 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
 
     // Difensivo: se il turno è di qualcuno non più in anagrafica, il valore
     // non comparirebbe tra le voci del dropdown e Flutter andrebbe in errore.
-    final employeeValue =
-        selectable.any((m) => m.uid == _employeeUid) ? _employeeUid : null;
+    final employeeValue = selectable.any((m) => m.uid == _employeeUid)
+        ? _employeeUid
+        : null;
+
+    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra.
+    final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(_isEditing ? 'Modifica turno' : 'Nuovo turno'),
+        flexibleSpace: const GlassBarBackground(),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: employeeValue,
-                decoration: const InputDecoration(
-                  labelText: 'Dipendente',
-                  prefixIcon: Icon(Icons.person_outline),
-                  border: OutlineInputBorder(),
+      body: AppBackground(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              topInset + AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            child: ConstrainedBox(
+              // Su schermi larghi (tablet) il form non si allarga a nastro.
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: GlassContainer(
+                blur: true,
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(AppRadius.xl),
                 ),
-                items: [
-                  for (final member in selectable)
-                    DropdownMenuItem(
-                      value: member.uid,
-                      child: Text(member.isDisattivato
-                          ? '${member.name} (disattivato)'
-                          : member.name),
-                    ),
-                ],
-                onChanged: (uid) => setState(() => _employeeUid = uid),
-                validator: (_) =>
-                    _employeeUid == null ? 'Scegli un dipendente.' : null,
-              ),
-              const SizedBox(height: 16),
-              // Campo data: readOnly, il valore si sceglie dal date picker.
-              // `key: ValueKey(_date)` forza la ricostruzione del campo quando
-              // la data cambia, così l'initialValue si aggiorna.
-              TextFormField(
-                key: ValueKey(_date),
-                readOnly: true,
-                onTap: _pickDate,
-                initialValue:
-                    _date == null ? '' : DateFormatter.full(_date!),
-                decoration: const InputDecoration(
-                  labelText: 'Data',
-                  prefixIcon: Icon(Icons.calendar_today_outlined),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (_) => _date == null ? 'Scegli la data.' : null,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      key: ValueKey('start-$_start'),
-                      readOnly: true,
-                      onTap: () => _pickTime(isStart: true),
-                      initialValue: _start == null ? '' : _formatTime(_start!),
-                      decoration: const InputDecoration(
-                        labelText: 'Inizio',
-                        prefixIcon: Icon(Icons.schedule),
-                        border: OutlineInputBorder(),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: employeeValue,
+                        decoration: const InputDecoration(
+                          labelText: 'Dipendente',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        items: [
+                          for (final member in selectable)
+                            DropdownMenuItem(
+                              value: member.uid,
+                              child: Text(
+                                member.isDisattivato
+                                    ? '${member.name} (disattivato)'
+                                    : member.name,
+                              ),
+                            ),
+                        ],
+                        onChanged: (uid) => setState(() => _employeeUid = uid),
+                        validator: (_) => _employeeUid == null
+                            ? 'Scegli un dipendente.'
+                            : null,
                       ),
-                      validator: (_) =>
-                          _start == null ? 'Ora di inizio.' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      key: ValueKey('end-$_end'),
-                      readOnly: true,
-                      onTap: () => _pickTime(isStart: false),
-                      initialValue: _end == null ? '' : _formatTime(_end!),
-                      decoration: const InputDecoration(
-                        labelText: 'Fine',
-                        prefixIcon: Icon(Icons.schedule),
-                        border: OutlineInputBorder(),
+                      const SizedBox(height: 16),
+                      // Campo data: readOnly, il valore si sceglie dal date picker.
+                      // `key: ValueKey(_date)` forza la ricostruzione del campo quando
+                      // la data cambia, così l'initialValue si aggiorna.
+                      TextFormField(
+                        key: ValueKey(_date),
+                        readOnly: true,
+                        onTap: _pickDate,
+                        initialValue: _date == null
+                            ? ''
+                            : DateFormatter.full(_date!),
+                        decoration: const InputDecoration(
+                          labelText: 'Data',
+                          prefixIcon: Icon(Icons.calendar_today_rounded),
+                        ),
+                        validator: (_) =>
+                            _date == null ? 'Scegli la data.' : null,
                       ),
-                      validator: (_) => _end == null ? 'Ora di fine.' : null,
-                    ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey('start-$_start'),
+                              readOnly: true,
+                              onTap: () => _pickTime(isStart: true),
+                              initialValue: _start == null
+                                  ? ''
+                                  : _formatTime(_start!),
+                              decoration: const InputDecoration(
+                                labelText: 'Inizio',
+                                prefixIcon: Icon(Icons.schedule_rounded),
+                              ),
+                              validator: (_) =>
+                                  _start == null ? 'Ora di inizio.' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey('end-$_end'),
+                              readOnly: true,
+                              onTap: () => _pickTime(isStart: false),
+                              initialValue: _end == null
+                                  ? ''
+                                  : _formatTime(_end!),
+                              decoration: const InputDecoration(
+                                labelText: 'Fine',
+                                prefixIcon: Icon(Icons.schedule_rounded),
+                              ),
+                              validator: (_) =>
+                                  _end == null ? 'Ora di fine.' : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _notesController,
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Note (facoltative)',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.notes_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      FilledButton(
+                        onPressed: isSaving ? null : _submit,
+                        child: isSaving
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                _isEditing ? 'Salva modifiche' : 'Crea turno',
+                              ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _notesController,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Note (facoltative)',
-                  alignLabelWithHint: true,
-                  prefixIcon: Icon(Icons.notes_outlined),
-                  border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: isSaving ? null : _submit,
-                child: isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(_isEditing ? 'Salva modifiche' : 'Crea turno'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

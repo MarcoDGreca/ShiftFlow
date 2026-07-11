@@ -44,12 +44,12 @@ class AppUser {
   /// Mappa da salvare su Firestore. Nota: `uid` non è incluso perché è
   /// l'id del documento, non un campo al suo interno.
   Map<String, dynamic> toFirestore() => {
-        'restaurantId': restaurantId,
-        'role': role,
-        'name': name,
-        'email': email,
-        'status': status,
-      };
+    'restaurantId': restaurantId,
+    'role': role,
+    'name': name,
+    'email': email,
+    'status': status,
+  };
 
   bool get isResponsabile => role == 'responsabile';
   bool get isDipendente => role == 'dipendente';

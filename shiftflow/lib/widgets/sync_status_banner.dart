@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_status_colors.dart';
+
 /// Striscia informativa sullo stato di sincronizzazione dei dati (RNF4 / §7.1).
 ///
 /// Non è un errore: comunica solo che si sta lavorando offline o che ci sono
@@ -18,25 +21,37 @@ class SyncStatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!isFromCache && !hasPendingWrites) return const SizedBox.shrink();
 
-    // Le scritture in coda sono l'informazione più importante da dare.
-    final (icon, text) = hasPendingWrites
-        ? (Icons.sync_problem, 'Modifiche non ancora sincronizzate')
-        : (Icons.cloud_off, 'Offline · dati dalla memoria locale');
+    final statusColors = Theme.of(context).statusColors;
 
-    final scheme = Theme.of(context).colorScheme;
+    // Le scritture in coda sono l'informazione più importante da dare:
+    // usano il colore "attenzione"; l'offline è solo informativo.
+    final (icon, text, background, foreground) = hasPendingWrites
+        ? (
+            Icons.sync_problem_rounded,
+            'Modifiche non ancora sincronizzate',
+            statusColors.warningContainer,
+            statusColors.onWarningContainer,
+          )
+        : (
+            Icons.cloud_off_rounded,
+            'Offline · dati dalla memoria locale',
+            statusColors.infoContainer,
+            statusColors.onInfoContainer,
+          );
+
     return Container(
       width: double.infinity,
-      color: scheme.secondaryContainer,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: background,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: scheme.onSecondaryContainer),
-          const SizedBox(width: 8),
+          Icon(icon, size: 18, color: foreground),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(color: scheme.onSecondaryContainer),
-            ),
+            child: Text(text, style: TextStyle(color: foreground)),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
+import '../models/restaurant.dart';
 import '../services/auth_service.dart';
 import '../services/restaurant_service.dart';
 
@@ -37,6 +38,23 @@ class StaffProvider extends ChangeNotifier {
     return null;
   }
 
+  Restaurant? _restaurant;
+
+  /// I dati del locale (per mostrarne il nome nel profilo), se già caricati.
+  Restaurant? get restaurant => _restaurant;
+
+  /// Carica una volta i dati del locale. Se fallisce non è grave: il profilo
+  /// semplicemente non mostra la riga del locale.
+  Future<void> loadRestaurant(String restaurantId) async {
+    if (_restaurant != null && _restaurant!.id == restaurantId) return;
+    try {
+      _restaurant = await _restaurantService.getRestaurant(restaurantId);
+      notifyListeners();
+    } catch (_) {
+      // Silenzioso: informazione accessoria, niente errori bloccanti.
+    }
+  }
+
   /// Ascolta l'elenco del personale del locale.
   void listenForRestaurant(String restaurantId) {
     if (_subscription != null && _restaurantId == restaurantId) return;
@@ -47,20 +65,22 @@ class StaffProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    _subscription = _restaurantService.watchStaff(restaurantId).listen(
-      (staff) {
-        _staff = staff;
-        _isLoading = false;
-        notifyListeners();
-      },
-      onError: (_) {
-        _subscription?.cancel();
-        _subscription = null;
-        _isLoading = false;
-        _errorMessage = 'Impossibile caricare il personale.';
-        notifyListeners();
-      },
-    );
+    _subscription = _restaurantService
+        .watchStaff(restaurantId)
+        .listen(
+          (staff) {
+            _staff = staff;
+            _isLoading = false;
+            notifyListeners();
+          },
+          onError: (_) {
+            _subscription?.cancel();
+            _subscription = null;
+            _isLoading = false;
+            _errorMessage = 'Impossibile caricare il personale.';
+            notifyListeners();
+          },
+        );
   }
 
   /// Crea l'account di un nuovo dipendente e lo aggiunge all'anagrafica.

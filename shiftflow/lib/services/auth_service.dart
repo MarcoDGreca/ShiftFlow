@@ -63,9 +63,11 @@ class AuthService {
             .doc(user.uid)
             .snapshots()
             .listen(
-          (doc) => controller.add(doc.exists ? AppUser.fromFirestore(doc) : null),
-          onError: (_) => controller.add(null),
-        );
+              (doc) => controller.add(
+                doc.exists ? AppUser.fromFirestore(doc) : null,
+              ),
+              onError: (_) => controller.add(null),
+            );
       }
     });
 
@@ -86,10 +88,7 @@ class AuthService {
   /// Non restituisce nulla: il profilo aggiornato arriva tramite [userChanges].
   /// In caso di credenziali errate lancia una [AuthException] con messaggio
   /// leggibile.
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signIn({required String email, required String password}) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
     } on FirebaseAuthException catch (e) {
@@ -121,8 +120,9 @@ class AuthService {
 
       // `doc()` senza argomenti genera un ID nuovo SENZA scrivere nulla: così
       // conosciamo il restaurantId in anticipo e lo mettiamo nel profilo utente.
-      final restaurantRef =
-          _db.collection(FirestoreCollections.restaurants).doc();
+      final restaurantRef = _db
+          .collection(FirestoreCollections.restaurants)
+          .doc();
       final restaurantId = restaurantRef.id;
 
       // 1) users/{uid}
@@ -148,10 +148,7 @@ class AuthService {
       await restaurantRef.set(restaurant.toFirestore());
 
       // 3) staff/{uid}
-      await restaurantRef
-          .collection(FirestoreCollections.staff)
-          .doc(uid)
-          .set({
+      await restaurantRef.collection(FirestoreCollections.staff).doc(uid).set({
         'name': name,
         'email': email,
         'role': UserRoles.responsabile,
@@ -217,14 +214,14 @@ class AuthService {
           .collection(FirestoreCollections.staff)
           .doc(uid)
           .set({
-        'name': name,
-        'email': email,
-        'role': UserRoles.dipendente,
-        // L'account è subito utilizzabile: "invitato" avrebbe senso con un
-        // vero flusso di invito via email, che richiederebbe un backend.
-        'status': StaffStatus.attivo,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+            'name': name,
+            'email': email,
+            'role': UserRoles.dipendente,
+            // L'account è subito utilizzabile: "invitato" avrebbe senso con un
+            // vero flusso di invito via email, che richiederebbe un backend.
+            'status': StaffStatus.attivo,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
     } on FirebaseAuthException catch (e) {
       throw AuthException(_messageFromCode(e.code));
     } catch (_) {
@@ -249,8 +246,7 @@ class AuthService {
   /// Legge il documento `users/{uid}` e lo converte in [AppUser].
   /// Restituisce `null` se il documento non esiste.
   Future<AppUser?> fetchUserDoc(String uid) async {
-    final doc =
-        await _db.collection(FirestoreCollections.users).doc(uid).get();
+    final doc = await _db.collection(FirestoreCollections.users).doc(uid).get();
     if (!doc.exists) return null;
     return AppUser.fromFirestore(doc);
   }

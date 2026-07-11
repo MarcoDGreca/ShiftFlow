@@ -48,10 +48,10 @@ class ShiftService {
   /// Costruisce una [ShiftsView] da uno snapshot, leggendone anche i metadati
   /// di sincronizzazione.
   ShiftsView _view(QuerySnapshot<Map<String, dynamic>> snap) => ShiftsView(
-        _sorted(snap.docs.map(Shift.fromFirestore).toList()),
-        isFromCache: snap.metadata.isFromCache,
-        hasPendingWrites: snap.metadata.hasPendingWrites,
-      );
+    _sorted(snap.docs.map(Shift.fromFirestore).toList()),
+    isFromCache: snap.metadata.isFromCache,
+    hasPendingWrites: snap.metadata.hasPendingWrites,
+  );
 
   /// Turni di un singolo dipendente (vista Dipendente).
   ///
@@ -70,9 +70,9 @@ class ShiftService {
 
   /// Tutti i turni del locale (calendario completo, vista Responsabile).
   Stream<ShiftsView> watchAllShifts(String restaurantId) {
-    return _shiftsRef(restaurantId)
-        .snapshots(includeMetadataChanges: true)
-        .map(_view);
+    return _shiftsRef(
+      restaurantId,
+    ).snapshots(includeMetadataChanges: true).map(_view);
   }
 
   Future<void> createShift(String restaurantId, Shift shift) async {
@@ -103,9 +103,9 @@ class ShiftService {
     required String endTime,
     String? excludeShiftId,
   }) async {
-    final snap = await _shiftsRef(restaurantId)
-        .where('employeeUid', isEqualTo: employeeUid)
-        .get();
+    final snap = await _shiftsRef(
+      restaurantId,
+    ).where('employeeUid', isEqualTo: employeeUid).get();
 
     bool sameDay(DateTime a, DateTime b) =>
         a.year == b.year && a.month == b.month && a.day == b.day;

@@ -7,8 +7,33 @@ class DateFormatter {
 
   static const _weekdays = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
   static const _months = [
-    'gen', 'feb', 'mar', 'apr', 'mag', 'giu',
-    'lug', 'ago', 'set', 'ott', 'nov', 'dic',
+    'gen',
+    'feb',
+    'mar',
+    'apr',
+    'mag',
+    'giu',
+    'lug',
+    'ago',
+    'set',
+    'ott',
+    'nov',
+    'dic',
+  ];
+
+  static const _monthsFull = [
+    'gennaio',
+    'febbraio',
+    'marzo',
+    'aprile',
+    'maggio',
+    'giugno',
+    'luglio',
+    'agosto',
+    'settembre',
+    'ottobre',
+    'novembre',
+    'dicembre',
   ];
 
   /// Es. `9/7/2026`.
@@ -19,4 +44,13 @@ class DateFormatter {
   static String full(DateTime date) =>
       '${_weekdays[date.weekday - 1]} ${date.day} '
       '${_months[date.month - 1]} ${date.year}';
+
+  /// Es. `luglio 2026` (intestazione del calendario mensile).
+  static String monthYear(DateTime date) =>
+      '${_monthsFull[date.month - 1]} ${date.year}';
+
+  /// Iniziale maiuscola del giorno della settimana (`L`, `M`, `M`, `G`, …):
+  /// riga dei giorni del calendario mensile.
+  static String dowLetter(DateTime date) =>
+      _weekdays[date.weekday - 1][0].toUpperCase();
 }

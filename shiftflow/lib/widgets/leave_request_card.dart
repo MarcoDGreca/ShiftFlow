@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_constants.dart';
+import '../core/theme/app_spacing.dart';
 import '../core/utils/date_formatter.dart';
 import '../models/leave_request.dart';
 import '../models/shift.dart';
+import 'glass_container.dart';
 import 'request_status_chip.dart';
 
 /// Card che mostra una richiesta di permesso/cambio turno.
@@ -35,52 +37,61 @@ class LeaveRequestCard extends StatelessWidget {
     final theme = Theme.of(context);
     final reason = request.reason?.trim();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_isCambio ? Icons.swap_horiz : Icons.beach_access,
-                    color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _isCambio ? 'Cambio turno' : 'Permesso',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                RequestStatusChip(status: request.status),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (employeeName != null)
-              _InfoLine(icon: Icons.person_outline, text: employeeName!),
-            if (relatedShift != null)
-              _InfoLine(
-                icon: Icons.event,
-                text: 'Turno: ${DateFormatter.full(relatedShift!.date)} · '
-                    '${relatedShift!.startTime}–${relatedShift!.endTime}',
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _isCambio
+                    ? Icons.swap_horiz_rounded
+                    : Icons.beach_access_rounded,
+                color: theme.colorScheme.primary,
               ),
-            if (reason != null && reason.isNotEmpty)
-              _InfoLine(icon: Icons.notes_outlined, text: reason),
-            if (request.createdAt != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
                 child: Text(
-                  'Inviata il ${DateFormatter.toDayLabel(request.createdAt!)}',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  _isCambio ? 'Cambio turno' : 'Permesso',
+                  style: theme.textTheme.titleMedium,
                 ),
               ),
-            if (actions != null) ...[
-              const SizedBox(height: 8),
-              Align(alignment: Alignment.centerRight, child: actions),
+              RequestStatusChip(status: request.status),
             ],
+          ),
+          const SizedBox(height: 4),
+          if (employeeName != null)
+            _InfoLine(icon: Icons.person_outline_rounded, text: employeeName!),
+          if (relatedShift != null)
+            _InfoLine(
+              icon: Icons.event_rounded,
+              text:
+                  'Turno: ${DateFormatter.full(relatedShift!.date)} · '
+                  '${relatedShift!.startTime}–${relatedShift!.endTime}',
+            ),
+          if (reason != null && reason.isNotEmpty)
+            _InfoLine(icon: Icons.notes_rounded, text: reason),
+          if (request.createdAt != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Inviata il ${DateFormatter.toDayLabel(request.createdAt!)}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (actions != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Align(alignment: Alignment.centerRight, child: actions),
           ],
-        ),
+        ],
       ),
     );
   }

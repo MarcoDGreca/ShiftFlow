@@ -35,14 +35,20 @@ class LeaveRequestProvider extends ChangeNotifier {
 
   /// Ascolta le richieste del singolo dipendente (storico personale).
   void listenForEmployee(String restaurantId, String employeeUid) {
-    _listen('emp|$restaurantId|$employeeUid', restaurantId,
-        () => _service.watchRequestsForEmployee(restaurantId, employeeUid));
+    _listen(
+      'emp|$restaurantId|$employeeUid',
+      restaurantId,
+      () => _service.watchRequestsForEmployee(restaurantId, employeeUid),
+    );
   }
 
   /// Ascolta tutte le richieste del locale (coda del Responsabile).
   void listenForRestaurant(String restaurantId) {
-    _listen('all|$restaurantId', restaurantId,
-        () => _service.watchAllRequests(restaurantId));
+    _listen(
+      'all|$restaurantId',
+      restaurantId,
+      () => _service.watchAllRequests(restaurantId),
+    );
   }
 
   void _listen(
@@ -84,14 +90,21 @@ class LeaveRequestProvider extends ChangeNotifier {
     String requestId, {
     required bool approved,
     required String resolvedByUid,
-  }) =>
-      _mutate((rid) => _service.resolveRequest(rid, requestId,
-          approved: approved, resolvedByUid: resolvedByUid));
+  }) => _mutate(
+    (rid) => _service.resolveRequest(
+      rid,
+      requestId,
+      approved: approved,
+      resolvedByUid: resolvedByUid,
+    ),
+  );
 
   /// Il dipendente annulla una propria richiesta ancora in attesa.
   Future<bool> cancel(String requestId, {required String employeeUid}) =>
-      _mutate((rid) =>
-          _service.cancelRequest(rid, requestId, employeeUid: employeeUid));
+      _mutate(
+        (rid) =>
+            _service.cancelRequest(rid, requestId, employeeUid: employeeUid),
+      );
 
   Future<bool> _mutate(Future<void> Function(String restaurantId) op) async {
     final rid = _restaurantId;

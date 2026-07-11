@@ -18,8 +18,12 @@ class RestaurantService {
 
   /// Legge i dati di un locale.
   Future<Restaurant?> getRestaurant(String restaurantId) async {
-    // TODO: get del documento restaurants/{restaurantId}.
-    throw UnimplementedError();
+    final doc = await _db
+        .collection(FirestoreCollections.restaurants)
+        .doc(restaurantId)
+        .get();
+    if (!doc.exists) return null;
+    return Restaurant.fromFirestore(doc);
   }
 
   /// Crea un nuovo locale e restituisce il suo id.
@@ -32,9 +36,9 @@ class RestaurantService {
 
   /// Stream in tempo reale dell'elenco personale del locale.
   Stream<List<AppUser>> watchStaff(String restaurantId) {
-    return _staffRef(restaurantId)
-        .snapshots()
-        .map((snap) => snap.docs.map(AppUser.fromFirestore).toList());
+    return _staffRef(
+      restaurantId,
+    ).snapshots().map((snap) => snap.docs.map(AppUser.fromFirestore).toList());
   }
 
   // Nota: l'AGGIUNTA di un dipendente non è qui ma in

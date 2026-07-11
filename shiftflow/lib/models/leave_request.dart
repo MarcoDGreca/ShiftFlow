@@ -29,7 +29,8 @@ class LeaveRequest {
   });
 
   factory LeaveRequest.fromFirestore(
-      DocumentSnapshot<Map<String, dynamic>> doc) {
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data() ?? <String, dynamic>{};
     return LeaveRequest(
       id: doc.id,
@@ -45,16 +46,15 @@ class LeaveRequest {
   }
 
   Map<String, dynamic> toFirestore() => {
-        'employeeUid': employeeUid,
-        'type': type,
-        'relatedShiftId': relatedShiftId,
-        'reason': reason,
-        'status': status,
-        'createdAt': createdAt != null
-            ? Timestamp.fromDate(createdAt!)
-            : FieldValue.serverTimestamp(),
-        'resolvedAt':
-            resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
-        'resolvedBy': resolvedBy,
-      };
+    'employeeUid': employeeUid,
+    'type': type,
+    'relatedShiftId': relatedShiftId,
+    'reason': reason,
+    'status': status,
+    'createdAt': createdAt != null
+        ? Timestamp.fromDate(createdAt!)
+        : FieldValue.serverTimestamp(),
+    'resolvedAt': resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
+    'resolvedBy': resolvedBy,
+  };
 }

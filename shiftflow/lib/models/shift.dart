@@ -41,14 +41,14 @@ class Shift {
   }
 
   Map<String, dynamic> toFirestore() => {
-        'employeeUid': employeeUid,
-        'date': Timestamp.fromDate(date),
-        'startTime': startTime,
-        'endTime': endTime,
-        'notes': notes,
-        'createdBy': createdBy,
-        'createdAt': createdAt != null
-            ? Timestamp.fromDate(createdAt!)
-            : FieldValue.serverTimestamp(),
-      };
+    'employeeUid': employeeUid,
+    'date': Timestamp.fromDate(date),
+    'startTime': startTime,
+    'endTime': endTime,
+    'notes': notes,
+    'createdBy': createdBy,
+    'createdAt': createdAt != null
+        ? Timestamp.fromDate(createdAt!)
+        : FieldValue.serverTimestamp(),
+  };
 }

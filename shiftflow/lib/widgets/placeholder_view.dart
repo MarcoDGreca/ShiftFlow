@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Vista segnaposto riutilizzabile per le sezioni non ancora implementate.
-/// Mostra un'icona, un titolo e una breve descrizione centrati.
+import '../core/theme/app_spacing.dart';
+
+/// Vista riutilizzabile per gli stati vuoti o d'errore delle sezioni.
+/// Mostra un'icona in un cerchio tenue, un titolo e una breve descrizione.
 class PlaceholderView extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -19,19 +21,32 @@ class PlaceholderView extends StatelessWidget {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: theme.colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(title, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.10),
+              ),
+              child: Icon(icon, size: 48, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

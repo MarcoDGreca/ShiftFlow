@@ -30,12 +30,12 @@ class Restaurant {
   }
 
   Map<String, dynamic> toFirestore() => {
-        'name': name,
-        'address': address,
-        'ownerUid': ownerUid,
-        // `serverTimestamp()` fa impostare l'ora al server, non al telefono.
-        'createdAt': createdAt != null
-            ? Timestamp.fromDate(createdAt!)
-            : FieldValue.serverTimestamp(),
-      };
+    'name': name,
+    'address': address,
+    'ownerUid': ownerUid,
+    // `serverTimestamp()` fa impostare l'ora al server, non al telefono.
+    'createdAt': createdAt != null
+        ? Timestamp.fromDate(createdAt!)
+        : FieldValue.serverTimestamp(),
+  };
 }

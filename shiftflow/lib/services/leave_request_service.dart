@@ -49,21 +49,18 @@ class LeaveRequestService {
     return _ref(restaurantId)
         .where('employeeUid', isEqualTo: employeeUid)
         .snapshots()
-        .map((s) =>
-            _sorted(s.docs.map(LeaveRequest.fromFirestore).toList()));
+        .map((s) => _sorted(s.docs.map(LeaveRequest.fromFirestore).toList()));
   }
 
   /// Tutte le richieste del locale (coda del Responsabile).
   Stream<List<LeaveRequest>> watchAllRequests(String restaurantId) {
     return _ref(restaurantId).snapshots().map(
-        (s) => _sorted(s.docs.map(LeaveRequest.fromFirestore).toList()));
+      (s) => _sorted(s.docs.map(LeaveRequest.fromFirestore).toList()),
+    );
   }
 
   /// Crea una nuova richiesta (stato iniziale "in_attesa").
-  Future<void> createRequest(
-    String restaurantId,
-    LeaveRequest request,
-  ) async {
+  Future<void> createRequest(String restaurantId, LeaveRequest request) async {
     await _ref(restaurantId).add(request.toFirestore());
   }
 
@@ -89,7 +86,8 @@ class LeaveRequestService {
       }
       if (snap.data()?['status'] != LeaveStatus.inAttesa) {
         throw const LeaveRequestException(
-            'La richiesta è già stata gestita o annullata.');
+          'La richiesta è già stata gestita o annullata.',
+        );
       }
       tx.update(ref, {
         'status': approved ? LeaveStatus.approvata : LeaveStatus.rifiutata,
@@ -117,11 +115,13 @@ class LeaveRequestService {
       final data = snap.data()!;
       if (data['employeeUid'] != employeeUid) {
         throw const LeaveRequestException(
-            'Puoi annullare solo le tue richieste.');
+          'Puoi annullare solo le tue richieste.',
+        );
       }
       if (data['status'] != LeaveStatus.inAttesa) {
         throw const LeaveRequestException(
-            'La richiesta è già stata gestita e non può essere annullata.');
+          'La richiesta è già stata gestita e non può essere annullata.',
+        );
       }
       tx.update(ref, {'status': LeaveStatus.annullata});
     });

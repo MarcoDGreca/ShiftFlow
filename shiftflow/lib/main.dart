@@ -19,9 +19,7 @@ Future<void> main() async {
   // Necessario prima di qualsiasi chiamata asincrona che tocca i plugin
   // (qui: l'inizializzazione di Firebase) prima di runApp.
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Handler delle notifiche in background: va registrato prima di runApp.
   NotificationService.registerBackgroundHandler();
   runApp(const ShiftFlowApp());
@@ -52,6 +50,9 @@ class ShiftFlowApp extends StatelessWidget {
         title: 'ShiftFlow',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        // Segue automaticamente il tema chiaro/scuro del sistema.
+        themeMode: ThemeMode.system,
         home: const AuthGate(),
       ),
     );

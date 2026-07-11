@@ -44,8 +44,9 @@ class AuthProvider extends ChangeNotifier {
 
   void _onUserChanged(AppUser? user) {
     _currentUser = user;
-    _status =
-        user == null ? AuthStatus.unauthenticated : AuthStatus.authenticated;
+    _status = user == null
+        ? AuthStatus.unauthenticated
+        : AuthStatus.authenticated;
     notifyListeners();
 
     // Configura le notifiche una volta per utente. Operazione di rete "best
@@ -60,10 +61,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Esegue il login. Aggiorna `isSubmitting`/`errorMessage`; l'esito positivo
   /// (utente + status) arriva tramite lo stream, non da qui.
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signIn({required String email, required String password}) async {
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
