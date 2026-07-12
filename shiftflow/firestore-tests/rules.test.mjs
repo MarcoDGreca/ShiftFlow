@@ -15,7 +15,16 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 
 // Project id "demo-*": l'emulatore lo tratta come offline, senza credenziali.
 const PROJECT_ID = 'demo-shiftflow';
@@ -81,6 +90,39 @@ describe('Isolamento multi-tenant (RNF2)', () => {
 
   it('un dipendente del ristorante B NON legge le richieste del ristorante A', async () => {
     await assertFails(getDoc(doc(as('empB'), 'restaurants/restA/leaveRequests/req1')));
+  });
+});
+
+// Seconda clausola di RNF2: la separazione vale anche DENTRO lo stesso locale.
+// req1 è di empA; empA2 è un collega dello stesso ristorante A.
+describe('Motivazioni delle richieste: private tra colleghi (RNF2)', () => {
+  it('un dipendente legge la PROPRIA richiesta', async () => {
+    await assertSucceeds(getDoc(doc(as('empA'), 'restaurants/restA/leaveRequests/req1')));
+  });
+
+  it('un dipendente NON legge la richiesta di un COLLEGA dello stesso locale', async () => {
+    await assertFails(getDoc(doc(as('empA2'), 'restaurants/restA/leaveRequests/req1')));
+  });
+
+  it('il responsabile legge le richieste del proprio locale', async () => {
+    await assertSucceeds(getDoc(doc(as('managerA'), 'restaurants/restA/leaveRequests/req1')));
+  });
+
+  // Le regole non "filtrano" una lista: la consentono solo se la query è già
+  // ristretta ai documenti leggibili. Verifichiamo i pattern usati dall'app.
+  it('il dipendente PUÒ elencare le proprie richieste (query ristretta)', async () => {
+    const col = collection(as('empA'), 'restaurants/restA/leaveRequests');
+    await assertSucceeds(getDocs(query(col, where('employeeUid', '==', 'empA'))));
+  });
+
+  it('il dipendente NON può elencare tutte le richieste del locale (query a tappeto)', async () => {
+    const col = collection(as('empA'), 'restaurants/restA/leaveRequests');
+    await assertFails(getDocs(col));
+  });
+
+  it('il responsabile PUÒ elencare tutte le richieste del locale', async () => {
+    const col = collection(as('managerA'), 'restaurants/restA/leaveRequests');
+    await assertSucceeds(getDocs(col));
   });
 });
 

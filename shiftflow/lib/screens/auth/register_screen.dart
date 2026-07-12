@@ -63,9 +63,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final theme = Theme.of(context);
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra:
-    // questo è lo spazio da lasciarle (status bar inclusa).
-    final topInset = MediaQuery.paddingOf(context).top;
+    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra: `top` è
+    // lo spazio da lasciarle (status bar inclusa), `bottom` tiene il pulsante
+    // sopra la barra gesti quando il form è lungo e scrollato.
+    final viewPadding = MediaQuery.paddingOf(context);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -78,9 +79,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              topInset + AppSpacing.lg,
+              viewPadding.top + AppSpacing.lg,
               AppSpacing.lg,
-              AppSpacing.lg,
+              viewPadding.bottom + AppSpacing.lg,
             ),
             child: ConstrainedBox(
               // Su schermi larghi (tablet) il form non si allarga a nastro.

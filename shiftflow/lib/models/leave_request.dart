@@ -1,5 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Cosa fare del turno collegato quando il Responsabile APPROVA una richiesta
+/// (RF6, "aggiornamento automatico del turno in caso di approvazione").
+///
+/// - [keep]:     il turno resta invariato (comportamento neutro);
+/// - [reassign]: il turno passa a un altro dipendente (flusso alt. di UC4);
+/// - [remove]:   il turno viene eliminato (l'autore non lo lavora più).
+enum ShiftResolution { keep, reassign, remove }
+
 /// Rappresenta il documento `restaurants/{rid}/leaveRequests/{requestId}`:
 /// una richiesta di permesso o cambio turno inviata da un dipendente.
 ///

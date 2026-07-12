@@ -243,6 +243,23 @@ class AuthService {
     );
   }
 
+  /// Osserva in tempo reale lo stato del membro nell'anagrafica del proprio
+  /// locale (`restaurants/{rid}/staff/{uid}`). Emette lo `status` corrente
+  /// ("attivo"/"disattivato"/…) oppure `null` se il documento non esiste.
+  ///
+  /// Serve al gate d'accesso: un dipendente disattivato non deve poter usare
+  /// l'app, neanche a sessione in corso (UC2-E2). Un membro può leggere il
+  /// proprio documento staff (le regole lo consentono a chi appartiene al locale).
+  Stream<String?> watchStaffStatus(String restaurantId, String uid) {
+    return _db
+        .collection(FirestoreCollections.restaurants)
+        .doc(restaurantId)
+        .collection(FirestoreCollections.staff)
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.data()?['status'] as String?);
+  }
+
   /// Legge il documento `users/{uid}` e lo converte in [AppUser].
   /// Restituisce `null` se il documento non esiste.
   Future<AppUser?> fetchUserDoc(String uid) async {

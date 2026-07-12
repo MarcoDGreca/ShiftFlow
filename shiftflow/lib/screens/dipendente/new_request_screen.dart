@@ -39,6 +39,27 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     final user = context.read<AuthProvider>().currentUser;
     if (user == null) return;
 
+    final provider = context.read<LeaveRequestProvider>();
+
+    // UC3-E2: rete di sicurezza contro i doppioni. Il menù disabilita già i
+    // turni con una richiesta in attesa, ma una richiesta potrebbe essere
+    // comparsa (es. da un altro dispositivo) dopo l'apertura di questa schermata.
+    final hasPending =
+        _relatedShiftId != null &&
+        provider.requests.any(
+          (r) =>
+              r.relatedShiftId == _relatedShiftId &&
+              r.status == LeaveStatus.inAttesa,
+        );
+    if (hasPending) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Esiste già una richiesta in attesa per questo turno.'),
+        ),
+      );
+      return;
+    }
+
     final reason = _reasonController.text.trim();
     final request = LeaveRequest(
       id: '',
@@ -49,7 +70,6 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       status: LeaveStatus.inAttesa,
     );
 
-    final provider = context.read<LeaveRequestProvider>();
     final ok = await provider.createRequest(request);
 
     if (!mounted) return;
@@ -67,14 +87,52 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final shifts = context.watch<ShiftProvider>().shifts;
+    final allShifts = context.watch<ShiftProvider>().shifts;
+    final requests = context.watch<LeaveRequestProvider>().requests;
     final isSaving = context.watch<LeaveRequestProvider>().isSaving;
     final theme = Theme.of(context);
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra.
-    final topInset = MediaQuery.paddingOf(context).top;
+    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
+    // tiene il pulsante sopra la barra gesti su schermi piccoli.
+    final viewPadding = MediaQuery.paddingOf(context);
 
     // Per un cambio turno indicare il turno è obbligatorio; per un permesso no.
     final shiftRequired = _type == LeaveType.cambioTurno;
+
+    // UC3-E1: non si richiede nulla su un turno già trascorso -> mostriamo solo
+    // i turni da oggi in avanti (l'orario non conta: un turno di oggi è valido).
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final futureShifts = allShifts.where((s) {
+      final day = DateTime(s.date.year, s.date.month, s.date.day);
+      return !day.isBefore(today);
+    }).toList();
+
+    // UC3-E2: turni per cui ho già una richiesta in attesa. Li mostriamo
+    // disabilitati, così non se ne può creare una seconda per lo stesso turno.
+    final pendingShiftIds = requests
+        .where(
+          (r) => r.status == LeaveStatus.inAttesa && r.relatedShiftId != null,
+        )
+        .map((r) => r.relatedShiftId!)
+        .toSet();
+
+    // Voci del menù "turno": eventuale "Nessuno" (solo per il permesso), poi i
+    // turni futuri; quelli già richiesti sono disabilitati e annotati.
+    final shiftItems = <DropdownMenuItem<String>>[
+      if (!shiftRequired)
+        const DropdownMenuItem(value: null, child: Text('Nessuno')),
+      for (final shift in futureShifts)
+        DropdownMenuItem(
+          value: shift.id,
+          enabled: !pendingShiftIds.contains(shift.id),
+          child: Text(
+            '${DateFormatter.full(shift.date)} · '
+            '${DateFormatter.timeRange(shift.startTime, shift.endTime)}'
+            '${pendingShiftIds.contains(shift.id) ? ' · richiesta in attesa' : ''}',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+    ];
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -87,9 +145,9 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              topInset + AppSpacing.lg,
+              viewPadding.top + AppSpacing.lg,
               AppSpacing.lg,
-              AppSpacing.lg,
+              viewPadding.bottom + AppSpacing.lg,
             ),
             child: ConstrainedBox(
               // Su schermi larghi (tablet) il form non si allarga a nastro.
@@ -138,22 +196,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
                               : 'Turno interessato (facoltativo)',
                           prefixIcon: const Icon(Icons.event_rounded),
                         ),
-                        items: [
-                          if (!shiftRequired)
-                            const DropdownMenuItem(
-                              value: null,
-                              child: Text('Nessuno'),
-                            ),
-                          for (final shift in shifts)
-                            DropdownMenuItem(
-                              value: shift.id,
-                              child: Text(
-                                '${DateFormatter.full(shift.date)} · '
-                                '${DateFormatter.timeRange(shift.startTime, shift.endTime)}',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
+                        items: shiftItems,
                         onChanged: (id) => setState(() => _relatedShiftId = id),
                         validator: (value) => shiftRequired && value == null
                             ? 'Scegli il turno da cambiare.'

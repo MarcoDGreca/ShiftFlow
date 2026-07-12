@@ -26,6 +26,17 @@ class LeaveRequestService {
       .doc(restaurantId)
       .collection(FirestoreCollections.leaveRequests);
 
+  /// Riferimento a un turno del locale (serve per aggiornarlo/eliminarlo nella
+  /// stessa transazione dell'approvazione, RF6).
+  DocumentReference<Map<String, dynamic>> _shiftRef(
+    String restaurantId,
+    String shiftId,
+  ) => _db
+      .collection(FirestoreCollections.restaurants)
+      .doc(restaurantId)
+      .collection(FirestoreCollections.shifts)
+      .doc(shiftId);
+
   /// Ordina: prima le richieste "in attesa" (sono quelle su cui agire), poi
   /// per data di invio decrescente (più recenti in alto). Fatto in memoria per
   /// non richiedere indici compositi.
@@ -72,28 +83,70 @@ class LeaveRequestService {
   /// altrimenti si ferma e segnala l'esito reale. Firestore rielabora la
   /// transazione se il documento cambia nel frattempo, quindi il controllo è
   /// sempre fatto su dati aggiornati: "vince chi scrive per primo".
+  /// In caso di APPROVAZIONE può anche agire sul turno collegato (RF6):
+  /// [shiftResolution] decide se lasciarlo com'è, riassegnarlo a
+  /// [reassignToUid] o eliminarlo. L'azione avviene nella STESSA transazione
+  /// dell'approvazione, così le due scritture sono atomiche: o riescono
+  /// entrambe o nessuna. Se il turno nel frattempo è stato eliminato,
+  /// l'approvazione va comunque a buon fine (semplicemente non lo tocca).
   Future<void> resolveRequest(
     String restaurantId,
     String requestId, {
     required bool approved,
     required String resolvedByUid,
+    String? relatedShiftId,
+    ShiftResolution shiftResolution = ShiftResolution.keep,
+    String? reassignToUid,
   }) async {
-    final ref = _ref(restaurantId).doc(requestId);
+    final reqRef = _ref(restaurantId).doc(requestId);
+
+    // Tocchiamo il turno solo se: si approva, c'è un turno collegato e la
+    // scelta non è "lascia invariato".
+    final touchesShift =
+        approved &&
+        relatedShiftId != null &&
+        shiftResolution != ShiftResolution.keep;
+    final shiftRef = touchesShift
+        ? _shiftRef(restaurantId, relatedShiftId)
+        : null;
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) {
+      // In una transazione tutte le LETTURE vanno prima delle scritture.
+      final reqSnap = await tx.get(reqRef);
+      if (!reqSnap.exists) {
         throw const LeaveRequestException('La richiesta non esiste più.');
       }
-      if (snap.data()?['status'] != LeaveStatus.inAttesa) {
+      if (reqSnap.data()?['status'] != LeaveStatus.inAttesa) {
         throw const LeaveRequestException(
           'La richiesta è già stata gestita o annullata.',
         );
       }
-      tx.update(ref, {
+
+      DocumentSnapshot<Map<String, dynamic>>? shiftSnap;
+      if (shiftRef != null) {
+        shiftSnap = await tx.get(shiftRef);
+      }
+
+      // --- Scritture. ---
+      tx.update(reqRef, {
         'status': approved ? LeaveStatus.approvata : LeaveStatus.rifiutata,
         'resolvedAt': FieldValue.serverTimestamp(),
         'resolvedBy': resolvedByUid,
       });
+
+      // Il turno lo modifichiamo solo se esiste ancora.
+      if (shiftRef != null && shiftSnap != null && shiftSnap.exists) {
+        switch (shiftResolution) {
+          case ShiftResolution.remove:
+            tx.delete(shiftRef);
+          case ShiftResolution.reassign:
+            if (reassignToUid != null) {
+              tx.update(shiftRef, {'employeeUid': reassignToUid});
+            }
+          case ShiftResolution.keep:
+            break; // già escluso sopra; incluso per esaustività
+        }
+      }
     });
   }
 

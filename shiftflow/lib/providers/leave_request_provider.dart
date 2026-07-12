@@ -85,17 +85,24 @@ class LeaveRequestProvider extends ChangeNotifier {
   Future<bool> createRequest(LeaveRequest request) =>
       _mutate((rid) => _service.createRequest(rid, request));
 
-  /// Il responsabile approva o rifiuta una richiesta.
+  /// Il responsabile approva o rifiuta una richiesta. In caso di approvazione
+  /// può anche agire sul turno collegato (RF6): vedi [ShiftResolution].
   Future<bool> resolve(
     String requestId, {
     required bool approved,
     required String resolvedByUid,
+    String? relatedShiftId,
+    ShiftResolution shiftResolution = ShiftResolution.keep,
+    String? reassignToUid,
   }) => _mutate(
     (rid) => _service.resolveRequest(
       rid,
       requestId,
       approved: approved,
       resolvedByUid: resolvedByUid,
+      relatedShiftId: relatedShiftId,
+      shiftResolution: shiftResolution,
+      reassignToUid: reassignToUid,
     ),
   );
 

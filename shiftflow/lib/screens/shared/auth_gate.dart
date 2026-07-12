@@ -6,6 +6,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_background.dart';
 import '../auth/login_screen.dart';
+import 'disabled_account_screen.dart';
 import 'role_home.dart';
 
 /// "Cancello" d'ingresso dell'app: guarda lo stato di [AuthProvider] e decide
@@ -17,7 +18,8 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = context.watch<AuthProvider>().status;
+    final auth = context.watch<AuthProvider>();
+    final status = auth.status;
 
     switch (status) {
       case AuthStatus.unknown:
@@ -47,7 +49,10 @@ class AuthGate extends StatelessWidget {
           ),
         );
       case AuthStatus.authenticated:
-        return const RoleHome();
+        // Autenticato ma disattivato nell'anagrafica: accesso negato (UC2-E2).
+        return auth.isDeactivated
+            ? const DisabledAccountScreen()
+            : const RoleHome();
       case AuthStatus.unauthenticated:
         return const LoginScreen();
     }

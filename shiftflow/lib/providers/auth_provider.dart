@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/constants/app_constants.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
@@ -21,6 +22,10 @@ class AuthProvider extends ChangeNotifier {
   final NotificationService _notificationService;
   StreamSubscription<AppUser?>? _subscription;
 
+  /// Osservazione dello stato del membro nell'anagrafica (attivo/disattivato).
+  StreamSubscription<String?>? _staffSub;
+  String? _staffWatchUid;
+
   /// uid per cui abbiamo già configurato le notifiche (evita di rifarlo a
   /// ogni emissione dello stream).
   String? _fcmUid;
@@ -35,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
   AppUser? _currentUser;
   bool _isSubmitting = false;
   String? _errorMessage;
+  bool _isDeactivated = false;
 
   AuthStatus get status => _status;
   AppUser? get currentUser => _currentUser;
@@ -42,11 +48,19 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isResponsabile => _currentUser?.isResponsabile ?? false;
 
+  /// True se il membro risulta DISATTIVATO nell'anagrafica: pur essendo ancora
+  /// autenticato, l'app deve negargli l'accesso alle funzioni (UC2-E2).
+  bool get isDeactivated => _isDeactivated;
+
   void _onUserChanged(AppUser? user) {
     _currentUser = user;
     _status = user == null
         ? AuthStatus.unauthenticated
         : AuthStatus.authenticated;
+
+    // (Ri)avvia l'osservazione dello stato "attivo/disattivato" del membro.
+    _watchStaffStatus(user);
+
     notifyListeners();
 
     // Configura le notifiche una volta per utente. Operazione di rete "best
@@ -57,6 +71,33 @@ class AuthProvider extends ChangeNotifier {
     } else if (user == null) {
       _fcmUid = null;
     }
+  }
+
+  /// Osserva lo stato del membro nell'anagrafica per bloccare un dipendente
+  /// disattivato (UC2-E2). Blocca solo su "disattivato" esplicito: un documento
+  /// staff assente non blocca (evita falsi positivi durante il caricamento).
+  void _watchStaffStatus(AppUser? user) {
+    // Utente cambiato (o logout): chiudiamo l'osservazione precedente e
+    // ripartiamo dallo stato "non disattivato".
+    if (user == null || user.uid != _staffWatchUid) {
+      _staffSub?.cancel();
+      _staffSub = null;
+      _staffWatchUid = null;
+      _isDeactivated = false;
+    }
+    if (user == null) return;
+    if (_staffWatchUid == user.uid) return; // già in ascolto su questo utente
+
+    _staffWatchUid = user.uid;
+    _staffSub = _authService
+        .watchStaffStatus(user.restaurantId, user.uid)
+        .listen((status) {
+          final deactivated = status == StaffStatus.disattivato;
+          if (deactivated != _isDeactivated) {
+            _isDeactivated = deactivated;
+            notifyListeners();
+          }
+        });
   }
 
   /// Esegue il login. Aggiorna `isSubmitting`/`errorMessage`; l'esito positivo
@@ -126,8 +167,9 @@ class AuthProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Importante: chiudere la sottoscrizione per evitare memory leak.
+    // Importante: chiudere le sottoscrizioni per evitare memory leak.
     _subscription?.cancel();
+    _staffSub?.cancel();
     super.dispose();
   }
 }

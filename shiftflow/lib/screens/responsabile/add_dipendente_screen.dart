@@ -52,8 +52,9 @@ class _AddDipendenteScreenState extends State<AddDipendenteScreen> {
   Widget build(BuildContext context) {
     final staff = context.watch<StaffProvider>();
     final theme = Theme.of(context);
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra.
-    final topInset = MediaQuery.paddingOf(context).top;
+    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
+    // tiene il pulsante sopra la barra gesti su schermi piccoli.
+    final viewPadding = MediaQuery.paddingOf(context);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -66,9 +67,9 @@ class _AddDipendenteScreenState extends State<AddDipendenteScreen> {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              topInset + AppSpacing.lg,
+              viewPadding.top + AppSpacing.lg,
               AppSpacing.lg,
-              AppSpacing.lg,
+              viewPadding.bottom + AppSpacing.lg,
             ),
             child: ConstrainedBox(
               // Su schermi larghi (tablet) il form non si allarga a nastro.

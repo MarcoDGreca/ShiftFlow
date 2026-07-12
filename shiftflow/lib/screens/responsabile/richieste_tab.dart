@@ -10,6 +10,7 @@ import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/requests_list_view.dart';
+import 'approve_request_sheet.dart';
 
 /// Sezione "Richieste" del Responsabile: coda di tutte le richieste del locale.
 /// Su quelle in attesa mostra i pulsanti Approva/Rifiuta; le altre mostrano
@@ -42,23 +43,62 @@ class _RichiesteResponsabileTabState extends State<RichiesteResponsabileTab> {
   }
 
   Future<void> _resolve(LeaveRequest request, {required bool approved}) async {
+    var shiftResolution = ShiftResolution.keep;
+    String? reassignToUid;
+
+    // Approvando una richiesta con un turno collegato, chiediamo cosa farne (RF6).
+    if (approved && request.relatedShiftId != null) {
+      final shift = context.read<ShiftProvider>().byId(request.relatedShiftId!);
+      // Se il turno non esiste più (già eliminato), approviamo e basta.
+      if (shift != null) {
+        // Riassegnabile a un collega attivo diverso dall'autore della richiesta.
+        final candidates = context
+            .read<StaffProvider>()
+            .staff
+            .where((m) => m.isAttivo && m.uid != request.employeeUid)
+            .toList();
+        final decision = await showApproveShiftSheet(
+          context,
+          shift: shift,
+          candidates: candidates,
+        );
+        if (decision == null) return; // il responsabile ha annullato
+        shiftResolution = decision.resolution;
+        reassignToUid = decision.reassignToUid;
+      }
+    }
+
+    if (!mounted) return;
     final auth = context.read<AuthProvider>();
     final provider = context.read<LeaveRequestProvider>();
     final ok = await provider.resolve(
       request.id,
       approved: approved,
       resolvedByUid: auth.currentUser!.uid,
+      relatedShiftId: request.relatedShiftId,
+      shiftResolution: shiftResolution,
+      reassignToUid: reassignToUid,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           ok
-              ? (approved ? 'Richiesta approvata.' : 'Richiesta rifiutata.')
+              ? _successMessage(approved, shiftResolution)
               : (provider.errorMessage ?? 'Operazione non riuscita.'),
         ),
       ),
     );
+  }
+
+  /// Messaggio di conferma coerente con l'azione svolta sul turno.
+  String _successMessage(bool approved, ShiftResolution resolution) {
+    if (!approved) return 'Richiesta rifiutata.';
+    return switch (resolution) {
+      ShiftResolution.reassign => 'Richiesta approvata e turno riassegnato.',
+      ShiftResolution.remove => 'Richiesta approvata e turno eliminato.',
+      ShiftResolution.keep => 'Richiesta approvata.',
+    };
   }
 
   @override

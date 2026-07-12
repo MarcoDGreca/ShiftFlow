@@ -39,21 +39,36 @@ class SyncStatusBanner extends StatelessWidget {
             statusColors.onInfoContainer,
           );
 
-    return Container(
-      width: double.infinity,
-      color: background,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+    // Banner arrotondato e rientrato, coerente col linguaggio a card glass:
+    // stessi colori semantici, raggio delle card e una hairline che ne
+    // definisce la forma sul gradiente dello sfondo.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        0,
       ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: foreground),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(text, style: TextStyle(color: foreground)),
-          ),
-        ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: foreground.withValues(alpha: 0.20)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: foreground),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(text, style: TextStyle(color: foreground)),
+            ),
+          ],
+        ),
       ),
     );
   }
