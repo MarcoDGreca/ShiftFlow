@@ -59,16 +59,20 @@ class _LoginScreenState extends State<LoginScreen> {
       body: AppBackground(
         child: SafeArea(
           child: Center(
-            child: SingleChildScrollView(
-              padding: AppSpacing.screenPadding,
-              child: ConstrainedBox(
-                // Su schermi larghi (tablet) il form non si allarga a nastro.
-                constraints: const BoxConstraints(maxWidth: 420),
+            child: ConstrainedBox(
+              // Su schermi larghi (tablet/iPad) il form non si allarga a nastro
+              // e, vincolato QUI fuori dallo scroll, resta centrato invece di
+              // ancorarsi a sinistra del viewport a tutta larghezza.
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: SingleChildScrollView(
+                padding: AppSpacing.screenPadding,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const ShiftFlowLogo(size: 96),
+                    // La colonna usa `stretch`: il logo (dimensione fissa) va
+                    // centrato esplicitamente, altrimenti resta ancorato a sinistra.
+                    const Center(child: ShiftFlowLogo(size: 96)),
                     const SizedBox(height: AppSpacing.md),
                     Text(
                       'ShiftFlow',
@@ -96,7 +100,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text('Accedi', style: theme.textTheme.titleLarge),
+                            Text(
+                              'Accedi',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.titleLarge,
+                            ),
                             const SizedBox(height: AppSpacing.md),
                             TextFormField(
                               controller: _emailController,
