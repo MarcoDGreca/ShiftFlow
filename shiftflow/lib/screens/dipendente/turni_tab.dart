@@ -167,7 +167,10 @@ class _ShiftCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  shift.endTime,
+                  // "+1" accanto alla fine se il turno scavalca la mezzanotte.
+                  DateFormatter.isOvernight(shift.startTime, shift.endTime)
+                      ? '${shift.endTime} (+1)'
+                      : shift.endTime,
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

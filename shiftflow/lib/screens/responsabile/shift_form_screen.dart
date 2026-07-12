@@ -104,13 +104,14 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
 
-    // Validazione bloccante (§7.4): la fine deve venire dopo l'inizio.
+    // I turni a cavallo di mezzanotte sono ammessi (es. 22:00→02:00 = finisce
+    // il giorno dopo). L'unico caso senza senso è inizio = fine (durata zero).
     final startMinutes = _start!.hour * 60 + _start!.minute;
     final endMinutes = _end!.hour * 60 + _end!.minute;
-    if (endMinutes <= startMinutes) {
+    if (endMinutes == startMinutes) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("L'ora di fine deve essere successiva all'inizio."),
+          content: Text("L'ora di fine non può essere uguale all'inizio."),
         ),
       );
       return;

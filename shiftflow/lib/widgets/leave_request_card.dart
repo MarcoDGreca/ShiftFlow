@@ -73,7 +73,7 @@ class LeaveRequestCard extends StatelessWidget {
               icon: Icons.event_rounded,
               text:
                   'Turno: ${DateFormatter.full(relatedShift!.date)} · '
-                  '${relatedShift!.startTime}–${relatedShift!.endTime}',
+                  '${DateFormatter.timeRange(relatedShift!.startTime, relatedShift!.endTime)}',
             ),
           if (reason != null && reason.isNotEmpty)
             _InfoLine(icon: Icons.notes_rounded, text: reason),

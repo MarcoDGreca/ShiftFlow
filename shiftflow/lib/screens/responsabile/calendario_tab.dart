@@ -297,7 +297,7 @@ class _ShiftCard extends StatelessWidget {
               children: [
                 Text(employeeName, style: theme.textTheme.titleMedium),
                 Text(
-                  '${shift.startTime}–${shift.endTime}'
+                  '${DateFormatter.timeRange(shift.startTime, shift.endTime)}'
                   '${shift.notes != null ? ' · ${shift.notes}' : ''}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,

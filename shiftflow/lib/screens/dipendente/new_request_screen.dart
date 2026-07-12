@@ -149,7 +149,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
                               value: shift.id,
                               child: Text(
                                 '${DateFormatter.full(shift.date)} · '
-                                '${shift.startTime}–${shift.endTime}',
+                                '${DateFormatter.timeRange(shift.startTime, shift.endTime)}',
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),

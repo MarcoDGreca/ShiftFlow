@@ -70,9 +70,7 @@ void main() {
       tester,
       const DecoratedBox(
         decoration: BoxDecoration(gradient: gradient),
-        child: Center(
-          child: ShiftFlowLogo(size: 716, monochrome: true),
-        ),
+        child: Center(child: ShiftFlowLogo(size: 716, monochrome: true)),
       ),
       1024,
       'assets/icon/app_icon.png',

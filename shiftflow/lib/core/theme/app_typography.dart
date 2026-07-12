@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Tipografia dell'app: font Manrope su tutta la scala Material,
 /// con titoli ed etichette leggermente più "pesanti" per dare carattere.
+///
+/// Manrope è impacchettato negli assets (font variabile registrato nel
+/// pubspec), quindi funziona anche al primo avvio senza rete.
 abstract final class AppTypography {
+  static const String fontFamily = 'Manrope';
+
   /// Costruisce il TextTheme partendo da quello base del tema (che porta
-  /// con sé i colori giusti per light/dark) e applicandoci Manrope.
+  /// con sé i colori giusti per light/dark) applicandoci Manrope.
   static TextTheme textTheme(TextTheme base) {
-    final manrope = GoogleFonts.manropeTextTheme(base);
+    final manrope = base.apply(fontFamily: fontFamily);
     return manrope.copyWith(
       displaySmall: manrope.displaySmall?.copyWith(fontWeight: FontWeight.w800),
       headlineMedium: manrope.headlineMedium?.copyWith(

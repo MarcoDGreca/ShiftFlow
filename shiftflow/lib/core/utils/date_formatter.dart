@@ -49,6 +49,32 @@ class DateFormatter {
   static String monthYear(DateTime date) =>
       '${_monthsFull[date.month - 1]} ${date.year}';
 
+  /// "HH:mm" -> minuti dalla mezzanotte. `null` se la stringa non è valida.
+  static int? _toMinutes(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return h * 60 + m;
+  }
+
+  /// True se il turno finisce il giorno dopo (turno notturno, es. 22:00→02:00).
+  /// Orari uguali NON sono notturni (durata zero, gestita altrove).
+  static bool isOvernight(String startTime, String endTime) {
+    final start = _toMinutes(startTime);
+    final end = _toMinutes(endTime);
+    if (start == null || end == null) return false;
+    return end < start;
+  }
+
+  /// Intervallo orario di un turno, es. `22:00–02:00 (+1)` per i turni che
+  /// scavalcano la mezzanotte. Fonte unica per mostrare gli orari nelle card.
+  static String timeRange(String startTime, String endTime) {
+    final suffix = isOvernight(startTime, endTime) ? ' (+1)' : '';
+    return '$startTime–$endTime$suffix';
+  }
+
   /// Iniziale maiuscola del giorno della settimana (`L`, `M`, `M`, `G`, …):
   /// riga dei giorni del calendario mensile.
   static String dowLetter(DateTime date) =>
