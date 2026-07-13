@@ -9,7 +9,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/async_state_view.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/info_pill.dart';
 import '../../widgets/initials_avatar.dart';
+import '../../widgets/section_header.dart';
 import 'add_dipendente_screen.dart';
 
 /// Sezione "Personale" del Responsabile: anagrafica del locale in tempo
@@ -105,6 +107,25 @@ class _PersonaleTabState extends State<PersonaleTab> {
     );
   }
 
+  /// Apre il form di aggiunta (dal FAB o dall'empty state).
+  void _openAdd() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AddDipendenteScreen()));
+  }
+
+  /// Riepilogo del team per l'intestazione, es. "4 attivi · 1 disattivato".
+  String _teamSummary(List<AppUser> staff) {
+    final active = staff.where((m) => m.isAttivo).length;
+    final inactive = staff.length - active;
+    final parts = [
+      active == 1 ? '1 attivo' : '$active attivi',
+      if (inactive > 0)
+        inactive == 1 ? '1 disattivato' : '$inactive disattivati',
+    ];
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final staffProvider = context.watch<StaffProvider>();
@@ -121,7 +142,12 @@ class _PersonaleTabState extends State<PersonaleTab> {
       isEmpty: staff.isEmpty,
       emptyIcon: Icons.groups_rounded,
       emptyTitle: 'Nessun membro',
-      emptySubtitle: 'Aggiungi il personale con il pulsante + qui sotto.',
+      emptySubtitle:
+          'Crea gli account dei tuoi dipendenti: potranno vedere i turni '
+          'e inviarti richieste.',
+      emptyActionLabel: 'Aggiungi dipendente',
+      emptyActionIcon: Icons.person_add_rounded,
+      onEmptyAction: _openAdd,
       child: ListView.builder(
         padding: EdgeInsets.fromLTRB(
           AppSpacing.sm,
@@ -129,26 +155,27 @@ class _PersonaleTabState extends State<PersonaleTab> {
           AppSpacing.sm,
           AppSizes.fabClearance + insets.bottom,
         ),
-        itemCount: staff.length,
+        // +1: la prima riga è l'intestazione con il riepilogo del team.
+        itemCount: staff.length + 1,
         itemBuilder: (context, i) {
-          final member = staff[i];
+          if (i == 0) {
+            return SectionHeader(
+              title: 'Team',
+              trailing: _teamSummary(staff),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm,
+                AppSpacing.xs,
+                AppSpacing.sm,
+                AppSpacing.xs,
+              ),
+            );
+          }
+          final member = staff[i - 1];
           // Il titolare (e l'utente stesso) non si possono rimuovere da qui.
           final manageable = !member.isResponsabile && member.uid != currentUid;
-          final subtitle = member.isDisattivato
-              ? '${member.email} · Disattivato'
-              : member.email;
-          return GlassCard(
-            child: ListTile(
-              leading: InitialsAvatar(name: member.name),
-              title: Text(member.name),
-              subtitle: Text(subtitle),
-              trailing: manageable
-                  ? _memberMenu(member)
-                  : Chip(
-                      label: Text(member.isResponsabile ? 'Titolare' : 'Tu'),
-                      visualDensity: VisualDensity.compact,
-                    ),
-            ),
+          return _MemberCard(
+            member: member,
+            trailing: manageable ? _memberMenu(member) : _roleChip(member),
           );
         },
       ),
@@ -164,14 +191,68 @@ class _PersonaleTabState extends State<PersonaleTab> {
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: insets.bottom),
         child: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddDipendenteScreen()),
-            );
-          },
+          onPressed: _openAdd,
           icon: const Icon(Icons.person_add_rounded),
           label: const Text('Aggiungi'),
         ),
+      ),
+    );
+  }
+
+  /// Chip per i membri non gestibili da qui: il titolare e l'utente stesso.
+  Widget _roleChip(AppUser member) {
+    final scheme = Theme.of(context).colorScheme;
+    return Chip(
+      label: Text(member.isResponsabile ? 'Titolare' : 'Tu'),
+      labelStyle: TextStyle(color: scheme.onPrimaryContainer),
+      backgroundColor: scheme.primaryContainer.withValues(alpha: 0.7),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+/// Riga di un membro del personale. Un membro disattivato si riconosce
+/// a colpo d'occhio: avatar attenuato e una pillola "Disattivato" accanto
+/// al nome (lo stato non va cercato dentro al testo).
+class _MemberCard extends StatelessWidget {
+  final AppUser member;
+  final Widget trailing;
+
+  const _MemberCard({required this.member, required this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusColors = theme.statusColors;
+    final disattivato = member.isDisattivato;
+
+    return GlassCard(
+      child: ListTile(
+        leading: Opacity(
+          opacity: disattivato ? 0.45 : 1,
+          child: InitialsAvatar(name: member.name),
+        ),
+        title: Wrap(
+          spacing: AppSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              member.name,
+              style: disattivato
+                  ? TextStyle(color: theme.colorScheme.onSurfaceVariant)
+                  : null,
+            ),
+            if (disattivato)
+              InfoPill(
+                icon: Icons.pause_circle_outline_rounded,
+                label: 'Disattivato',
+                background: statusColors.warningContainer,
+                foreground: statusColors.onWarningContainer,
+              ),
+          ],
+        ),
+        subtitle: Text(member.email),
+        trailing: trailing,
       ),
     );
   }

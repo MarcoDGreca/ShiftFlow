@@ -186,8 +186,16 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     }
   }
 
+  /// Spiegazione breve del tipo scelto, mostrata sotto il selettore.
+  String get _typeHint => switch (_type) {
+    LeaveType.ferie => 'Un periodo di più giorni interi (dal / al).',
+    LeaveType.cambioTurno => 'Chiedi di cambiare un turno già assegnato.',
+    _ => 'Un solo giorno, con orario facoltativo.',
+  };
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isSaving = context.watch<LeaveRequestProvider>().isSaving;
     // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
     // tiene il pulsante sopra la barra gesti su schermi piccoli.
@@ -223,30 +231,42 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      DropdownButtonFormField<String>(
-                        initialValue: _type,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Tipo di richiesta',
-                          prefixIcon: Icon(Icons.category_outlined),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
+                      // Tre opzioni, tre pulsanti in vista: con così poche
+                      // scelte un menù a tendina le nasconderebbe e basta
+                      // (regola: rendere visibili le opzioni disponibili).
+                      Text(
+                        'Tipo di richiesta',
+                        style: theme.textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      SegmentedButton<String>(
+                        showSelectedIcon: false,
+                        segments: const [
+                          ButtonSegment(
                             value: LeaveType.permesso,
-                            child: Text('Permesso (un giorno)'),
+                            label: Text('Permesso'),
                           ),
-                          DropdownMenuItem(
+                          ButtonSegment(
                             value: LeaveType.ferie,
-                            child: Text('Ferie (più giorni)'),
+                            label: Text('Ferie'),
                           ),
-                          DropdownMenuItem(
+                          ButtonSegment(
                             value: LeaveType.cambioTurno,
-                            child: Text('Cambio turno'),
+                            label: Text('Cambio'),
                           ),
                         ],
-                        onChanged: (value) {
-                          if (value != null) setState(() => _type = value);
-                        },
+                        selected: {_type},
+                        onSelectionChanged: (selection) =>
+                            setState(() => _type = selection.first),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      // Una riga di aiuto che cambia col tipo scelto: spiega
+                      // cosa aspettarsi prima di compilare (feedback immediato).
+                      Text(
+                        _typeHint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       ..._buildTypeFields(),

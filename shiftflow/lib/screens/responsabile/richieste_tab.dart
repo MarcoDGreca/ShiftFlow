@@ -114,6 +114,8 @@ class _RichiesteResponsabileTabState extends State<RichiesteResponsabileTab> {
       emptyIcon: Icons.inbox_rounded,
       emptyTitle: 'Nessuna richiesta',
       emptySubtitle: 'Le richieste inviate dai dipendenti compariranno qui.',
+      // Per chi gestisce, le richieste in attesa sono una coda di lavoro.
+      pendingSectionTitle: 'Da gestire',
       employeeNameFor: (request) =>
           staffProvider.byUid(request.employeeUid)?.name ?? 'Dipendente',
       relatedShiftFor: (request) => request.relatedShiftId == null

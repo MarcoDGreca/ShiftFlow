@@ -4,16 +4,32 @@ import '../core/theme/app_spacing.dart';
 
 /// Vista riutilizzabile per gli stati vuoti o d'errore delle sezioni.
 /// Mostra un'icona in un cerchio tenue, un titolo e una breve descrizione.
+///
+/// Con [actionLabel] e [onAction] compare anche un pulsante: un "empty state
+/// azionabile" non lascia l'utente in un vicolo cieco ma gli offre subito il
+/// passo successivo (regola base: ogni schermata ha un'azione chiara).
 class PlaceholderView extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+
+  /// Etichetta del pulsante d'azione (facoltativo, va in coppia con [onAction]).
+  final String? actionLabel;
+
+  /// Icona del pulsante d'azione.
+  final IconData? actionIcon;
+
+  /// Cosa fare al tocco del pulsante d'azione.
+  final VoidCallback? onAction;
 
   const PlaceholderView({
     super.key,
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.actionLabel,
+    this.actionIcon,
+    this.onAction,
   });
 
   @override
@@ -50,6 +66,14 @@ class PlaceholderView extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton.tonalIcon(
+                onPressed: onAction,
+                icon: Icon(actionIcon ?? Icons.add_rounded),
+                label: Text(actionLabel!),
+              ),
+            ],
           ],
         ),
       ),

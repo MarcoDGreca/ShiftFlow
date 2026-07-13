@@ -100,4 +100,46 @@ class DateFormatter {
   /// riga dei giorni del calendario mensile.
   static String dowLetter(DateTime date) =>
       _weekdays[date.weekday - 1][0].toUpperCase();
+
+  /// Etichetta relativa di un giorno rispetto a oggi: `Oggi`, `Domani`,
+  /// altrimenti `null` (chi chiama mostra la data normale). Le app di turni
+  /// parlano "come le persone": nessuno dice "gio 9 lug" per intendere oggi.
+  static String? relativeDay(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    final diff = day.difference(today).inDays;
+    if (diff == 0) return 'Oggi';
+    if (diff == 1) return 'Domani';
+    return null;
+  }
+
+  /// Durata di un turno in forma compatta: `5 h`, `4 h 30 min`, `45 min`.
+  /// Gestisce i turni notturni (fine il giorno dopo, es. 22:00→02:00 = 4 h).
+  /// `null` se gli orari non sono validi o la durata è zero.
+  static String? durationLabel(String startTime, String endTime) {
+    final start = _toMinutes(startTime);
+    final end = _toMinutes(endTime);
+    if (start == null || end == null || start == end) return null;
+    final minutes = end > start ? end - start : (24 * 60 - start) + end;
+    return minutesLabel(minutes);
+  }
+
+  /// Minuti totali di un turno (0 se orari non validi): serve per sommare le
+  /// ore di più turni (riepilogo del giorno del Responsabile).
+  static int durationMinutes(String startTime, String endTime) {
+    final start = _toMinutes(startTime);
+    final end = _toMinutes(endTime);
+    if (start == null || end == null || start == end) return 0;
+    return end > start ? end - start : (24 * 60 - start) + end;
+  }
+
+  /// Da minuti a etichetta compatta: `90` -> `1 h 30 min`, `120` -> `2 h`.
+  static String minutesLabel(int minutes) {
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '$m min';
+    if (m == 0) return '$h h';
+    return '$h h $m min';
+  }
 }

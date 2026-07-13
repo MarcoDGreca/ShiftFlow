@@ -6,6 +6,7 @@ import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/section_header.dart';
 
 /// Schermata di registrazione del Responsabile (titolare).
 ///
@@ -103,7 +104,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleLarge,
                       ),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Crea il tuo locale e inizia a organizzare i turni.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      // Un form lungo si compila meglio a blocchi tematici:
+                      // chi sei, il tuo locale, le credenziali (chunking).
+                      const SectionHeader(
+                        title: 'I tuoi dati',
+                        padding: EdgeInsets.fromLTRB(
+                          0,
+                          AppSpacing.lg,
+                          0,
+                          AppSpacing.sm,
+                        ),
+                      ),
                       TextFormField(
                         controller: _nameController,
                         textCapitalization: TextCapitalization.words,
@@ -115,7 +134,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: (v) =>
                             Validators.notEmpty(v, field: 'Il nome'),
                       ),
-                      const SizedBox(height: AppSpacing.md),
+                      const SectionHeader(
+                        title: 'Il locale',
+                        padding: EdgeInsets.fromLTRB(
+                          0,
+                          AppSpacing.lg,
+                          0,
+                          AppSpacing.sm,
+                        ),
+                      ),
                       TextFormField(
                         controller: _restaurantNameController,
                         textCapitalization: TextCapitalization.words,
@@ -139,7 +166,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: (v) =>
                             Validators.notEmpty(v, field: "L'indirizzo"),
                       ),
-                      const SizedBox(height: AppSpacing.md),
+                      const SectionHeader(
+                        title: 'Accesso',
+                        padding: EdgeInsets.fromLTRB(
+                          0,
+                          AppSpacing.lg,
+                          0,
+                          AppSpacing.sm,
+                        ),
+                      ),
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,

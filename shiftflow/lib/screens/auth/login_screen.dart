@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/branding/shiftflow_logo.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
@@ -74,10 +75,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     // centrato esplicitamente, altrimenti resta ancorato a sinistra.
                     const Center(child: ShiftFlowLogo(size: 96)),
                     const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'ShiftFlow',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineMedium,
+                    // Il nome dell'app "veste" il gradiente del logo: brand
+                    // riconoscibile al primo sguardo (ShaderMask dipinge il
+                    // testo con la sfumatura al posto del colore pieno).
+                    ShaderMask(
+                      shaderCallback: (bounds) => LinearGradient(
+                        colors:
+                            theme.brightness == Brightness.dark
+                            ? const [
+                                AppColors.emerald300,
+                                AppColors.emerald600,
+                              ]
+                            : const [
+                                AppColors.emerald600,
+                                AppColors.emerald900,
+                              ],
+                      ).createShader(bounds),
+                      blendMode: BlendMode.srcIn,
+                      child: Text(
+                        'ShiftFlow',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineMedium,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(

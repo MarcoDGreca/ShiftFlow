@@ -3,15 +3,22 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_status_colors.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/initials_avatar.dart';
+import '../../widgets/section_header.dart';
 import 'edit_profile_screen.dart';
 
 /// Sezione "Profilo", condivisa tra Dipendente e Responsabile.
 /// Mostra i dati dell'utente loggato (letti da `users/{uid}`) e il logout.
+///
+/// I dati sono raggruppati per argomento (Contatti / Dettagli / Locale):
+/// blocchi piccoli con un titolo si scandiscono meglio di un'unica card
+/// lunga (regola del raggruppamento). Il logout usa il colore "pericolo":
+/// non è distruttivo ma interrompe la sessione, meglio distinguerlo bene.
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
 
@@ -30,11 +37,20 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
+  /// Padding degli header di sezione, allineato alle card sottostanti.
+  static const _headerPadding = EdgeInsets.fromLTRB(
+    AppSpacing.xs,
+    AppSpacing.lg,
+    AppSpacing.xs,
+    AppSpacing.sm,
+  );
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
     final restaurant = context.watch<StaffProvider>().restaurant;
     final theme = Theme.of(context);
+    final statusColors = theme.statusColors;
 
     final phone = user?.phone ?? '';
     final position = user?.position ?? '';
@@ -85,7 +101,11 @@ class _ProfileTabState extends State<ProfileTab> {
                 backgroundColor: theme.colorScheme.primaryContainer,
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+
+            const SectionHeader(
+              title: 'Contatti',
+              padding: _headerPadding,
+            ),
             GlassCard(
               margin: EdgeInsets.zero,
               child: Column(
@@ -102,7 +122,18 @@ class _ProfileTabState extends State<ProfileTab> {
                     value: phone.isEmpty ? 'Non impostato' : phone,
                     placeholder: phone.isEmpty,
                   ),
-                  _divider(theme),
+                ],
+              ),
+            ),
+
+            const SectionHeader(
+              title: 'Dettagli',
+              padding: _headerPadding,
+            ),
+            GlassCard(
+              margin: EdgeInsets.zero,
+              child: Column(
+                children: [
                   _infoTile(
                     icon: Icons.work_outline_rounded,
                     title: 'Mansione',
@@ -118,23 +149,28 @@ class _ProfileTabState extends State<ProfileTab> {
                         : 'Non impostata',
                     placeholder: birthDate == null,
                   ),
-                  if (restaurant != null) ...[
-                    _divider(theme),
-                    ListTile(
-                      leading: const Icon(Icons.storefront_outlined),
-                      title: const Text('Locale'),
-                      subtitle: Text(
-                        restaurant.address.isEmpty
-                            ? restaurant.name
-                            : '${restaurant.name}\n${restaurant.address}',
-                      ),
-                      isThreeLine: restaurant.address.isNotEmpty,
-                    ),
-                  ],
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+
+            if (restaurant != null) ...[
+              const SectionHeader(
+                title: 'Locale',
+                padding: _headerPadding,
+              ),
+              GlassCard(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.storefront_outlined),
+                  title: Text(restaurant.name),
+                  subtitle: restaurant.address.isEmpty
+                      ? null
+                      : Text(restaurant.address),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: AppSpacing.xl),
             FilledButton.tonalIcon(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const EditProfileScreen()),
@@ -144,6 +180,12 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
             const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: statusColors.danger,
+                side: BorderSide(
+                  color: statusColors.danger.withValues(alpha: 0.45),
+                ),
+              ),
               onPressed: () => context.read<AuthProvider>().signOut(),
               icon: const Icon(Icons.logout_rounded),
               label: const Text('Esci'),

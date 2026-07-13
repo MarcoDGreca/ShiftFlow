@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_spacing.dart';
+import '../core/theme/app_status_colors.dart';
 import '../core/utils/date_formatter.dart';
 import '../models/leave_request.dart';
 import '../models/shift.dart';
@@ -15,6 +16,10 @@ import 'request_status_chip.dart';
 ///  - [relatedShift]: il turno collegato, se disponibile;
 ///  - [actions]: i pulsanti Approva/Rifiuta (solo il Responsabile, e solo se
 ///    la richiesta è in attesa).
+///
+/// L'icona del tipo sta in un cerchio col colore semantico già usato dalla
+/// legenda del calendario (ferie = info, permesso = attenzione, cambio =
+/// primario): stesso colore → stesso significato, ovunque nell'app.
 class LeaveRequestCard extends StatelessWidget {
   final LeaveRequest request;
   final String? employeeName;
@@ -56,6 +61,7 @@ class LeaveRequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final statusColors = theme.statusColors;
     final reason = request.reason?.trim();
 
     final IconData typeIcon = request.isCambioTurno
@@ -68,6 +74,12 @@ class LeaveRequestCard extends StatelessWidget {
         : request.isFerie
         ? 'Ferie'
         : 'Permesso';
+    // Stessi colori della legenda del calendario (coerenza semantica).
+    final Color accent = request.isCambioTurno
+        ? theme.colorScheme.primary
+        : request.isFerie
+        ? statusColors.info
+        : statusColors.warning;
     final period = _period();
 
     return GlassCard(
@@ -82,7 +94,16 @@ class LeaveRequestCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(typeIcon, color: theme.colorScheme.primary),
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent.withValues(alpha: 0.15),
+                ),
+                child: Icon(typeIcon, color: accent, size: 22),
+              ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(typeLabel, style: theme.textTheme.titleMedium),
@@ -90,7 +111,7 @@ class LeaveRequestCard extends StatelessWidget {
               RequestStatusChip(status: request.status),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.sm),
           if (employeeName != null)
             _InfoLine(icon: Icons.person_outline_rounded, text: employeeName!),
           if (period != null)

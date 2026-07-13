@@ -83,6 +83,13 @@ class _RichiesteTabState extends State<RichiesteTab> {
     );
   }
 
+  /// Apre il form di nuova richiesta (dal FAB o dall'empty state).
+  void _openNewRequest() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NewRequestScreen()));
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<LeaveRequestProvider>();
@@ -100,7 +107,11 @@ class _RichiesteTabState extends State<RichiesteTab> {
         emptyIcon: Icons.mail_outline_rounded,
         emptyTitle: 'Nessuna richiesta',
         emptySubtitle:
-            'Invia la tua prima richiesta con il pulsante + qui sotto.',
+            'Ferie, permessi o cambi turno: invia qui la tua prima richiesta.',
+        // Empty state azionabile: stessa azione del FAB, ma a portata di
+        // pollice proprio dove l'occhio sta già guardando.
+        emptyActionLabel: 'Nuova richiesta',
+        onEmptyAction: _openNewRequest,
         relatedShiftFor: (request) => request.relatedShiftId == null
             ? null
             : shiftProvider.byId(request.relatedShiftId!),
@@ -114,11 +125,7 @@ class _RichiesteTabState extends State<RichiesteTab> {
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         child: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const NewRequestScreen()));
-          },
+          onPressed: _openNewRequest,
           icon: const Icon(Icons.add_rounded),
           label: const Text('Nuova richiesta'),
         ),

@@ -11,6 +11,7 @@ import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/info_pill.dart';
 import '../../widgets/initials_avatar.dart';
 import '../../widgets/leave_day_card.dart';
 import '../../widgets/placeholder_view.dart';
@@ -93,7 +94,6 @@ class _CalendarioTabState extends State<CalendarioTab> {
     final shiftProvider = context.watch<ShiftProvider>();
     final staffProvider = context.watch<StaffProvider>();
     final leaveProvider = context.watch<LeaveRequestProvider>();
-    final theme = Theme.of(context);
 
     // Le barre della home sono trasparenti: il contenuto fisso deve partire
     // sotto la AppBar e la lista finire oltre la NavigationBar.
@@ -156,9 +156,10 @@ class _CalendarioTabState extends State<CalendarioTab> {
                 AppSpacing.md,
                 AppSpacing.xs,
               ),
-              child: Text(
-                DateFormatter.full(_selectedDay),
-                style: theme.textTheme.titleMedium,
+              child: _DayHeader(
+                day: _selectedDay,
+                shifts: selectedShifts,
+                leavesCount: selectedLeaves.length,
               ),
             ),
             Expanded(
@@ -168,10 +169,13 @@ class _CalendarioTabState extends State<CalendarioTab> {
                       padding: EdgeInsets.only(
                         bottom: AppSizes.fabClearance + insets.bottom,
                       ),
-                      child: const PlaceholderView(
+                      child: PlaceholderView(
                         icon: Icons.event_busy_rounded,
                         title: 'Niente in questo giorno',
-                        subtitle: 'Tocca + per creare un turno in questa data.',
+                        subtitle:
+                            'Nessun turno o assenza in questa data.',
+                        actionLabel: 'Crea turno',
+                        onAction: _openForm,
                       ),
                     )
                   // Prima le assenze (contesto), poi i turni del giorno.
@@ -222,6 +226,77 @@ class _CalendarioTabState extends State<CalendarioTab> {
           label: const Text('Nuovo turno'),
         ),
       ),
+    );
+  }
+}
+
+/// Intestazione del giorno selezionato: la data (con "Oggi"/"Domani" quando
+/// possibile) e un riepilogo a colpo d'occhio — quanti turni, ore totali
+/// pianificate, assenze. È la domanda del responsabile: "com'è coperta
+/// questa giornata?", e la risposta sta qui senza dover contare le card.
+class _DayHeader extends StatelessWidget {
+  final DateTime day;
+  final List<Shift> shifts;
+  final int leavesCount;
+
+  const _DayHeader({
+    required this.day,
+    required this.shifts,
+    required this.leavesCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final statusColors = theme.statusColors;
+
+    final relative = DateFormatter.relativeDay(day);
+    final title = relative != null
+        ? '$relative · ${DateFormatter.full(day)}'
+        : DateFormatter.full(day);
+
+    // Ore totali pianificate nel giorno (somma delle durate dei turni).
+    final totalMinutes = shifts.fold<int>(
+      0,
+      (sum, s) => sum + DateFormatter.durationMinutes(s.startTime, s.endTime),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.textTheme.titleMedium),
+        if (shifts.isNotEmpty || leavesCount > 0) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: [
+              if (shifts.isNotEmpty)
+                InfoPill(
+                  icon: Icons.event_rounded,
+                  label: shifts.length == 1
+                      ? '1 turno'
+                      : '${shifts.length} turni',
+                  background: scheme.primary.withValues(alpha: 0.12),
+                  foreground: scheme.primary,
+                ),
+              if (totalMinutes > 0)
+                InfoPill(
+                  icon: Icons.timelapse_rounded,
+                  label: DateFormatter.minutesLabel(totalMinutes),
+                ),
+              if (leavesCount > 0)
+                InfoPill(
+                  icon: Icons.beach_access_rounded,
+                  label: leavesCount == 1 ? '1 assenza' : '$leavesCount assenze',
+                  background: statusColors.infoContainer,
+                  foreground: statusColors.onInfoContainer,
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

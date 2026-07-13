@@ -9,16 +9,21 @@ import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/async_state_view.dart';
+import '../../widgets/date_badge.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/info_pill.dart';
 import '../../widgets/leave_day_card.dart';
+import '../../widgets/next_shift_hero.dart';
 import '../../widgets/placeholder_view.dart';
+import '../../widgets/section_header.dart';
 import '../../widgets/shift_calendar.dart';
 import '../../widgets/sync_status_banner.dart';
 import 'shift_detail_sheet.dart';
 
 /// Sezione "I miei turni" del Dipendente. Due modi di guardare gli stessi
 /// turni (solo i propri, RF9):
-/// - **Lista**: elenco con filtro Prossimi/Passati (storico incluso);
+/// - **Lista**: il prossimo turno in evidenza (pattern "Up Next" delle app di
+///   turni) e sotto i successivi; i passati dietro un filtro;
 /// - **Calendario**: griglia mensile con i pallini dei propri turni e, sotto,
 ///   l'elenco del giorno scelto.
 class TurniTab extends StatefulWidget {
@@ -104,7 +109,7 @@ class _TurniTabState extends State<TurniTab> {
               ButtonSegment(
                 value: _ViewMode.lista,
                 label: Text('Lista'),
-                icon: Icon(Icons.view_list_rounded),
+                icon: Icon(Icons.view_agenda_rounded),
               ),
               ButtonSegment(
                 value: _ViewMode.calendario,
@@ -126,7 +131,9 @@ class _TurniTabState extends State<TurniTab> {
     );
   }
 
-  /// Vista "Lista": filtro Prossimi/Passati e card con badge data.
+  /// Vista "Lista": prossimo turno in evidenza, poi i successivi; i passati
+  /// dietro due chip-filtro leggeri (meno ingombranti di un secondo
+  /// SegmentedButton impilato).
   Widget _buildList(ShiftProvider shiftProvider, EdgeInsets insets) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -142,57 +149,81 @@ class _TurniTabState extends State<TurniTab> {
         .reversed
         .toList();
 
-    final visibili = _filtro == _Filtro.prossimi ? prossimi : passati;
+    final showProssimi = _filtro == _Filtro.prossimi;
+    final visibili = showProssimi ? prossimi : passati;
+
+    // In "Prossimi" il primo turno diventa la card hero; gli altri seguono.
+    final hero = showProssimi && prossimi.isNotEmpty ? prossimi.first : null;
+    final rest = hero == null ? visibili : prossimi.sublist(1);
 
     return Column(
       children: [
+        // Filtro Prossimi/Passati come chip: gerarchia più leggera rispetto
+        // al selettore di vista qui sopra (che è la scelta principale).
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
-          ),
-          child: SegmentedButton<_Filtro>(
-            segments: const [
-              ButtonSegment(
-                value: _Filtro.prossimi,
-                label: Text('Prossimi'),
-                icon: Icon(Icons.upcoming_outlined),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Row(
+            children: [
+              ChoiceChip(
+                label: const Text('Prossimi'),
+                selected: showProssimi,
+                onSelected: (_) =>
+                    setState(() => _filtro = _Filtro.prossimi),
               ),
-              ButtonSegment(
-                value: _Filtro.passati,
-                label: Text('Passati'),
-                icon: Icon(Icons.history_rounded),
+              const SizedBox(width: AppSpacing.sm),
+              ChoiceChip(
+                label: const Text('Passati'),
+                selected: !showProssimi,
+                onSelected: (_) => setState(() => _filtro = _Filtro.passati),
               ),
             ],
-            selected: {_filtro},
-            onSelectionChanged: (selection) =>
-                setState(() => _filtro = selection.first),
           ),
         ),
+        const SizedBox(height: AppSpacing.xs),
         Expanded(
           child: AsyncStateView(
             isLoading: shiftProvider.isLoading,
             errorMessage: shiftProvider.errorMessage,
             isEmpty: visibili.isEmpty,
-            emptyIcon: Icons.event_busy_rounded,
-            emptyTitle: _filtro == _Filtro.prossimi
+            emptyIcon: showProssimi
+                ? Icons.event_busy_rounded
+                : Icons.history_rounded,
+            emptyTitle: showProssimi
                 ? 'Nessun turno in programma'
                 : 'Nessun turno passato',
-            emptySubtitle: _filtro == _Filtro.prossimi
+            emptySubtitle: showProssimi
                 ? 'Quando il responsabile ti assegnerà un turno, comparirà qui.'
                 : 'Qui troverai lo storico dei tuoi turni.',
-            child: ListView.builder(
+            child: ListView(
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.sm,
                 0,
                 AppSpacing.sm,
                 AppSpacing.md + insets.bottom,
               ),
-              itemCount: visibili.length,
-              itemBuilder: (context, i) => _ShiftCard(
-                shift: visibili[i],
-                onTap: () => showShiftDetailSheet(context, visibili[i]),
-              ),
+              children: [
+                if (hero != null)
+                  NextShiftHero(
+                    shift: hero,
+                    onTap: () => showShiftDetailSheet(context, hero),
+                  ),
+                if (hero != null && rest.isNotEmpty)
+                  SectionHeader(
+                    title: 'In programma',
+                    trailing: '${rest.length}',
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.xs,
+                    ),
+                  ),
+                for (final shift in rest)
+                  _ShiftCard(
+                    shift: shift,
+                    onTap: () => showShiftDetailSheet(context, shift),
+                  ),
+              ],
             ),
           ),
         ),
@@ -223,6 +254,13 @@ class _TurniTabState extends State<TurniTab> {
     final selectedLeaves = leaveProvider.approvedLeavesOn(_selectedDay);
     final isEmpty = selectedShifts.isEmpty && selectedLeaves.isEmpty;
 
+    // "Oggi"/"Domani" prima della data: il giorno scelto si legge a colpo
+    // d'occhio senza fare i conti col calendario.
+    final relative = DateFormatter.relativeDay(_selectedDay);
+    final dayTitle = relative != null
+        ? '$relative · ${DateFormatter.full(_selectedDay)}'
+        : DateFormatter.full(_selectedDay);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -244,10 +282,7 @@ class _TurniTabState extends State<TurniTab> {
             AppSpacing.md,
             AppSpacing.xs,
           ),
-          child: Text(
-            DateFormatter.full(_selectedDay),
-            style: theme.textTheme.titleMedium,
-          ),
+          child: Text(dayTitle, style: theme.textTheme.titleMedium),
         ),
         Expanded(
           child: isEmpty
@@ -282,7 +317,7 @@ class _TurniTabState extends State<TurniTab> {
 
 /// Card di un singolo turno (sola lettura). A sinistra un elemento distintivo
 /// — il badge con la data in modalità Lista, un'icona orologio nella vista
-/// Calendario (dove il giorno è già in evidenza) — poi orario e note.
+/// Calendario (dove il giorno è già in evidenza) — poi orario, durata e note.
 class _ShiftCard extends StatelessWidget {
   final Shift shift;
 
@@ -301,7 +336,7 @@ class _ShiftCard extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final Widget leading = showDate
-        ? _DateBadge(date: shift.date)
+        ? DateBadge(date: shift.date)
         : Container(
             width: 52,
             height: 52,
@@ -312,6 +347,11 @@ class _ShiftCard extends StatelessWidget {
             ),
             child: Icon(Icons.schedule_rounded, color: scheme.primary),
           );
+
+    final duration = DateFormatter.durationLabel(
+      shift.startTime,
+      shift.endTime,
+    );
 
     return GlassCard(
       onTap: onTap,
@@ -324,9 +364,22 @@ class _ShiftCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  DateFormatter.timeRange(shift.startTime, shift.endTime),
-                  style: theme.textTheme.titleMedium,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        DateFormatter.timeRange(
+                          shift.startTime,
+                          shift.endTime,
+                        ),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    // La durata risponde a "quanto lavoro?" senza far fare
+                    // i conti a mente sull'orario.
+                    if (duration != null)
+                      InfoPill(icon: Icons.timelapse_rounded, label: duration),
+                  ],
                 ),
                 if (shift.notes != null && shift.notes!.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xs),
@@ -353,54 +406,10 @@ class _ShiftCard extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Piccolo blocco data (giorno della settimana, numero, mese) usato come
-/// elemento a sinistra delle card in modalità Lista.
-class _DateBadge extends StatelessWidget {
-  final DateTime date;
-
-  const _DateBadge({required this.date});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Container(
-      width: 52,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            DateFormatter.weekdayShort(date).toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-              letterSpacing: 0.5,
-            ),
-          ),
-          Text(
-            '${date.day}',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: scheme.primary,
-              fontWeight: FontWeight.w700,
-              height: 1.1,
-            ),
-          ),
-          Text(
-            DateFormatter.monthShort(date),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
+          const SizedBox(width: AppSpacing.xs),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
           ),
         ],
       ),
