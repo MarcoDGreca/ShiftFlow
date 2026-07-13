@@ -39,12 +39,16 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.unknown;
   AppUser? _currentUser;
   bool _isSubmitting = false;
+  bool _isSavingProfile = false;
   String? _errorMessage;
   bool _isDeactivated = false;
 
   AuthStatus get status => _status;
   AppUser? get currentUser => _currentUser;
   bool get isSubmitting => _isSubmitting;
+
+  /// True mentre è in corso il salvataggio delle modifiche al profilo.
+  bool get isSavingProfile => _isSavingProfile;
   String? get errorMessage => _errorMessage;
   bool get isResponsabile => _currentUser?.isResponsabile ?? false;
 
@@ -143,6 +147,36 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } finally {
       _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Salva i dati anagrafici del profilo dell'utente loggato. Ritorna `true`
+  /// se è andata a buon fine; il profilo aggiornato arriva alla UI tramite lo
+  /// stream (non lo impostiamo a mano qui).
+  Future<bool> updateProfile({
+    required String phone,
+    required String position,
+    DateTime? birthDate,
+  }) async {
+    final uid = _currentUser?.uid;
+    if (uid == null) return false;
+    _isSavingProfile = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _authService.updateProfile(
+        uid: uid,
+        phone: phone,
+        position: position,
+        birthDate: birthDate,
+      );
+      return true;
+    } catch (_) {
+      _errorMessage = 'Salvataggio non riuscito. Riprova.';
+      return false;
+    } finally {
+      _isSavingProfile = false;
       notifyListeners();
     }
   }

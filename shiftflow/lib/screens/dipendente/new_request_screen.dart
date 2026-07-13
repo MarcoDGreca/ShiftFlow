@@ -11,7 +11,11 @@ import '../../providers/shift_provider.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_container.dart';
 
-/// Form con cui il Dipendente invia una richiesta di permesso o cambio turno.
+/// Form con cui il Dipendente invia una richiesta. Tre tipi:
+///  - **Permesso**: un singolo giorno, con orario facoltativo;
+///  - **Ferie**: un intervallo di giorni interi (dal / al);
+///  - **Cambio turno**: legato a un turno esistente.
+/// I campi mostrati cambiano in base al tipo scelto.
 class NewRequestScreen extends StatefulWidget {
   const NewRequestScreen({super.key});
 
@@ -24,12 +28,73 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   final _reasonController = TextEditingController();
 
   String _type = LeaveType.permesso;
+
+  // Cambio turno.
   String? _relatedShiftId;
+
+  // Ferie (dal/al) e Permesso (giorno = _startDate).
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  // Permesso: orario facoltativo.
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
 
   @override
   void dispose() {
     _reasonController.dispose();
     super.dispose();
+  }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// TimeOfDay(8, 5) -> "08:05" (padding: le stringhe restano ordinabili).
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:'
+      '${t.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _pickDate({required bool isStart}) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // La fine non può precedere l'inizio: sposta lì la sua data minima.
+    final firstDate = isStart ? today : (_startDate ?? today);
+    final initial = (isStart ? _startDate : _endDate) ?? _startDate ?? today;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(firstDate) ? firstDate : initial,
+      firstDate: firstDate,
+      lastDate: now.add(const Duration(days: 365 * 2)),
+      helpText: isStart
+          ? (_type == LeaveType.ferie ? 'Data inizio' : 'Giorno')
+          : 'Data fine',
+      cancelText: 'Annulla',
+      confirmText: 'OK',
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        _startDate = picked;
+        // Se la fine è ora precedente all'inizio, la riallineiamo.
+        if (_endDate != null && _endDate!.isBefore(picked)) _endDate = picked;
+      } else {
+        _endDate = picked;
+      }
+    });
+  }
+
+  Future<void> _pickTime({required bool isStart}) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime:
+          (isStart ? _startTime : _endTime) ??
+          const TimeOfDay(hour: 9, minute: 0),
+      helpText: isStart ? 'Ora inizio' : 'Ora fine',
+      cancelText: 'Annulla',
+      confirmText: 'OK',
+    );
+    if (picked != null) {
+      setState(() => isStart ? _startTime = picked : _endTime = picked);
+    }
   }
 
   Future<void> _submit() async {
@@ -38,26 +103,58 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
 
     final user = context.read<AuthProvider>().currentUser;
     if (user == null) return;
-
     final provider = context.read<LeaveRequestProvider>();
 
-    // UC3-E2: rete di sicurezza contro i doppioni. Il menù disabilita già i
-    // turni con una richiesta in attesa, ma una richiesta potrebbe essere
-    // comparsa (es. da un altro dispositivo) dopo l'apertura di questa schermata.
-    final hasPending =
-        _relatedShiftId != null &&
-        provider.requests.any(
-          (r) =>
-              r.relatedShiftId == _relatedShiftId &&
-              r.status == LeaveStatus.inAttesa,
-        );
-    if (hasPending) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Esiste già una richiesta in attesa per questo turno.'),
-        ),
-      );
-      return;
+    // Campi che dipendono dal tipo.
+    DateTime? startDate;
+    DateTime? endDate;
+    String? startTime;
+    String? endTime;
+    String? relatedShiftId;
+
+    switch (_type) {
+      case LeaveType.ferie:
+        startDate = _dateOnly(_startDate!);
+        endDate = _dateOnly(_endDate!);
+      case LeaveType.permesso:
+        startDate = _dateOnly(_startDate!);
+        endDate = startDate; // un solo giorno
+        // L'orario è facoltativo, ma se c'è dev'essere completo (inizio + fine).
+        if ((_startTime == null) != (_endTime == null)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Indica sia l\'ora di inizio che quella di fine, '
+                'oppure lascia entrambe vuote.',
+              ),
+            ),
+          );
+          return;
+        }
+        startTime = _startTime != null ? _formatTime(_startTime!) : null;
+        endTime = _endTime != null ? _formatTime(_endTime!) : null;
+      case LeaveType.cambioTurno:
+        relatedShiftId = _relatedShiftId;
+        // UC3-E2: rete di sicurezza contro i doppioni. Il menù disabilita già i
+        // turni con una richiesta in attesa, ma potrebbe essercene comparsa una
+        // (es. da un altro dispositivo) dopo l'apertura di questa schermata.
+        final hasPending =
+            relatedShiftId != null &&
+            provider.requests.any(
+              (r) =>
+                  r.relatedShiftId == relatedShiftId &&
+                  r.status == LeaveStatus.inAttesa,
+            );
+        if (hasPending) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Esiste già una richiesta in attesa per questo turno.',
+              ),
+            ),
+          );
+          return;
+        }
     }
 
     final reason = _reasonController.text.trim();
@@ -65,9 +162,13 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       id: '',
       employeeUid: user.uid,
       type: _type,
-      relatedShiftId: _relatedShiftId,
+      relatedShiftId: relatedShiftId,
       reason: reason.isEmpty ? null : reason,
       status: LeaveStatus.inAttesa,
+      startDate: startDate,
+      endDate: endDate,
+      startTime: startTime,
+      endTime: endTime,
     );
 
     final ok = await provider.createRequest(request);
@@ -87,52 +188,10 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allShifts = context.watch<ShiftProvider>().shifts;
-    final requests = context.watch<LeaveRequestProvider>().requests;
     final isSaving = context.watch<LeaveRequestProvider>().isSaving;
-    final theme = Theme.of(context);
     // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
     // tiene il pulsante sopra la barra gesti su schermi piccoli.
     final viewPadding = MediaQuery.paddingOf(context);
-
-    // Per un cambio turno indicare il turno è obbligatorio; per un permesso no.
-    final shiftRequired = _type == LeaveType.cambioTurno;
-
-    // UC3-E1: non si richiede nulla su un turno già trascorso -> mostriamo solo
-    // i turni da oggi in avanti (l'orario non conta: un turno di oggi è valido).
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final futureShifts = allShifts.where((s) {
-      final day = DateTime(s.date.year, s.date.month, s.date.day);
-      return !day.isBefore(today);
-    }).toList();
-
-    // UC3-E2: turni per cui ho già una richiesta in attesa. Li mostriamo
-    // disabilitati, così non se ne può creare una seconda per lo stesso turno.
-    final pendingShiftIds = requests
-        .where(
-          (r) => r.status == LeaveStatus.inAttesa && r.relatedShiftId != null,
-        )
-        .map((r) => r.relatedShiftId!)
-        .toSet();
-
-    // Voci del menù "turno": eventuale "Nessuno" (solo per il permesso), poi i
-    // turni futuri; quelli già richiesti sono disabilitati e annotati.
-    final shiftItems = <DropdownMenuItem<String>>[
-      if (!shiftRequired)
-        const DropdownMenuItem(value: null, child: Text('Nessuno')),
-      for (final shift in futureShifts)
-        DropdownMenuItem(
-          value: shift.id,
-          enabled: !pendingShiftIds.contains(shift.id),
-          child: Text(
-            '${DateFormatter.full(shift.date)} · '
-            '${DateFormatter.timeRange(shift.startTime, shift.endTime)}'
-            '${pendingShiftIds.contains(shift.id) ? ' · richiesta in attesa' : ''}',
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-    ];
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -164,44 +223,33 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Tipo di richiesta',
-                        style: theme.textTheme.labelLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      SegmentedButton<String>(
-                        segments: const [
-                          ButtonSegment(
+                      DropdownButtonFormField<String>(
+                        initialValue: _type,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo di richiesta',
+                          prefixIcon: Icon(Icons.category_outlined),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
                             value: LeaveType.permesso,
-                            label: Text('Permesso'),
-                            icon: Icon(Icons.beach_access_rounded),
+                            child: Text('Permesso (un giorno)'),
                           ),
-                          ButtonSegment(
+                          DropdownMenuItem(
+                            value: LeaveType.ferie,
+                            child: Text('Ferie (più giorni)'),
+                          ),
+                          DropdownMenuItem(
                             value: LeaveType.cambioTurno,
-                            label: Text('Cambio turno'),
-                            icon: Icon(Icons.swap_horiz_rounded),
+                            child: Text('Cambio turno'),
                           ),
                         ],
-                        selected: {_type},
-                        onSelectionChanged: (s) =>
-                            setState(() => _type = s.first),
+                        onChanged: (value) {
+                          if (value != null) setState(() => _type = value);
+                        },
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      DropdownButtonFormField<String>(
-                        initialValue: _relatedShiftId,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: shiftRequired
-                              ? 'Turno interessato'
-                              : 'Turno interessato (facoltativo)',
-                          prefixIcon: const Icon(Icons.event_rounded),
-                        ),
-                        items: shiftItems,
-                        onChanged: (id) => setState(() => _relatedShiftId = id),
-                        validator: (value) => shiftRequired && value == null
-                            ? 'Scegli il turno da cambiare.'
-                            : null,
-                      ),
+                      ..._buildTypeFields(),
                       const SizedBox(height: AppSpacing.lg),
                       TextFormField(
                         controller: _reasonController,
@@ -234,6 +282,160 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// I campi specifici del tipo di richiesta selezionato.
+  List<Widget> _buildTypeFields() {
+    switch (_type) {
+      case LeaveType.ferie:
+        return [
+          _dateField(
+            label: 'Dal',
+            icon: Icons.calendar_today_rounded,
+            value: _startDate,
+            onTap: () => _pickDate(isStart: true),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _dateField(
+            label: 'Al',
+            icon: Icons.event_rounded,
+            value: _endDate,
+            onTap: () => _pickDate(isStart: false),
+          ),
+        ];
+      case LeaveType.permesso:
+        return [
+          _dateField(
+            label: 'Giorno',
+            icon: Icons.calendar_today_rounded,
+            value: _startDate,
+            onTap: () => _pickDate(isStart: true),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _timeField(
+                  label: 'Dalle (facolt.)',
+                  value: _startTime,
+                  onTap: () => _pickTime(isStart: true),
+                  onClear: () => setState(() => _startTime = null),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _timeField(
+                  label: 'Alle (facolt.)',
+                  value: _endTime,
+                  onTap: () => _pickTime(isStart: false),
+                  onClear: () => setState(() => _endTime = null),
+                ),
+              ),
+            ],
+          ),
+        ];
+      case LeaveType.cambioTurno:
+        return [_buildShiftDropdown()];
+      default:
+        return const [];
+    }
+  }
+
+  /// Campo data readOnly (il valore si sceglie dal date picker).
+  /// `key: ValueKey(value)` forza la ricostruzione quando la data cambia,
+  /// così l'initialValue si aggiorna.
+  Widget _dateField({
+    required String label,
+    required IconData icon,
+    required DateTime? value,
+    required VoidCallback onTap,
+  }) {
+    return TextFormField(
+      key: ValueKey('$label-$value'),
+      readOnly: true,
+      onTap: onTap,
+      initialValue: value == null ? '' : DateFormatter.full(value),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+      ),
+      validator: (_) => value == null ? 'Scegli la data.' : null,
+    );
+  }
+
+  /// Campo orario readOnly e facoltativo, con pulsante per azzerarlo.
+  Widget _timeField({
+    required String label,
+    required TimeOfDay? value,
+    required VoidCallback onTap,
+    required VoidCallback onClear,
+  }) {
+    return TextFormField(
+      key: ValueKey('$label-$value'),
+      readOnly: true,
+      onTap: onTap,
+      initialValue: value == null ? '' : _formatTime(value),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.schedule_rounded),
+        suffixIcon: value != null
+            ? IconButton(
+                tooltip: 'Rimuovi',
+                icon: const Icon(Icons.clear_rounded),
+                onPressed: onClear,
+              )
+            : null,
+      ),
+    );
+  }
+
+  /// Menù del turno collegato (solo per il cambio turno). Mostra i turni
+  /// futuri; quelli con una richiesta in attesa sono disabilitati (UC3-E2).
+  Widget _buildShiftDropdown() {
+    final allShifts = context.watch<ShiftProvider>().shifts;
+    final requests = context.watch<LeaveRequestProvider>().requests;
+
+    // UC3-E1: nessuna richiesta su un turno già trascorso -> solo da oggi in poi
+    // (l'orario non conta: un turno di oggi è ancora valido).
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final futureShifts = allShifts.where((s) {
+      final day = DateTime(s.date.year, s.date.month, s.date.day);
+      return !day.isBefore(today);
+    }).toList();
+
+    // Turni per cui ho già una richiesta in attesa: disabilitati e annotati.
+    final pendingShiftIds = requests
+        .where(
+          (r) => r.status == LeaveStatus.inAttesa && r.relatedShiftId != null,
+        )
+        .map((r) => r.relatedShiftId!)
+        .toSet();
+
+    return DropdownButtonFormField<String>(
+      initialValue: _relatedShiftId,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Turno interessato',
+        prefixIcon: Icon(Icons.event_rounded),
+      ),
+      items: [
+        for (final shift in futureShifts)
+          DropdownMenuItem(
+            value: shift.id,
+            enabled: !pendingShiftIds.contains(shift.id),
+            child: Text(
+              '${DateFormatter.full(shift.date)} · '
+              '${DateFormatter.timeRange(shift.startTime, shift.endTime)}'
+              '${pendingShiftIds.contains(shift.id) ? ' · richiesta in attesa' : ''}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (id) => setState(() => _relatedShiftId = id),
+      validator: (value) =>
+          value == null ? 'Scegli il turno da cambiare.' : null,
     );
   }
 }

@@ -33,6 +33,21 @@ class LeaveRequestProvider extends ChangeNotifier {
   int get pendingCount =>
       _requests.where((r) => r.status == LeaveStatus.inAttesa).length;
 
+  /// Le assenze (ferie/permessi) **approvate** che coprono il giorno indicato.
+  /// Alimenta i marker e il dettaglio del giorno nei calendari. In base alla
+  /// sottoscrizione attiva contiene i soli turni del dipendente (vista propria)
+  /// o quelli di tutto il locale (vista responsabile).
+  List<LeaveRequest> approvedLeavesOn(DateTime day) {
+    return _requests
+        .where(
+          (r) =>
+              r.status == LeaveStatus.approvata &&
+              (r.isFerie || r.isPermesso) &&
+              r.coversDay(day),
+        )
+        .toList();
+  }
+
   /// Ascolta le richieste del singolo dipendente (storico personale).
   void listenForEmployee(String restaurantId, String employeeUid) {
     _listen(

@@ -260,6 +260,24 @@ class AuthService {
         .map((doc) => doc.data()?['status'] as String?);
   }
 
+  /// Aggiorna i dati anagrafici modificabili dal profilo (`users/{uid}`).
+  ///
+  /// Scrittura *parziale* (solo questi campi): ruolo e ristorante restano
+  /// intatti, così l'aggiornamento passa le regole di sicurezza. Il nuovo
+  /// profilo arriva alla UI da solo tramite lo stream [userChanges].
+  Future<void> updateProfile({
+    required String uid,
+    required String phone,
+    required String position,
+    DateTime? birthDate,
+  }) async {
+    await _db.collection(FirestoreCollections.users).doc(uid).update({
+      'phone': phone,
+      'position': position,
+      'birthDate': birthDate != null ? Timestamp.fromDate(birthDate) : null,
+    });
+  }
+
   /// Legge il documento `users/{uid}` e lo converte in [AppUser].
   /// Restituisce `null` se il documento non esiste.
   Future<AppUser?> fetchUserDoc(String uid) async {

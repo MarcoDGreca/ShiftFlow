@@ -37,7 +37,8 @@ class StaffStatus {
 class LeaveType {
   LeaveType._();
 
-  static const String permesso = 'permesso';
+  static const String permesso = 'permesso'; // singolo giorno, orario opzionale
+  static const String ferie = 'ferie'; // intervallo di giorni interi
   static const String cambioTurno = 'cambio_turno';
 }
 

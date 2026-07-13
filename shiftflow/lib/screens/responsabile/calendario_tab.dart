@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_status_colors.dart';
@@ -8,11 +7,14 @@ import '../../core/utils/date_formatter.dart';
 import '../../core/utils/dialogs.dart';
 import '../../models/shift.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/initials_avatar.dart';
+import '../../widgets/leave_day_card.dart';
 import '../../widgets/placeholder_view.dart';
+import '../../widgets/shift_calendar.dart';
 import '../../widgets/sync_status_banner.dart';
 import 'shift_form_screen.dart';
 
@@ -45,6 +47,10 @@ class _CalendarioTabState extends State<CalendarioTab> {
       if (user != null) {
         context.read<ShiftProvider>().listenForRestaurant(user.restaurantId);
         context.read<StaffProvider>().listenForRestaurant(user.restaurantId);
+        // Assenze approvate del locale, per i marker e il dettaglio del giorno.
+        context.read<LeaveRequestProvider>().listenForRestaurant(
+          user.restaurantId,
+        );
       }
     });
   }
@@ -86,15 +92,15 @@ class _CalendarioTabState extends State<CalendarioTab> {
   Widget build(BuildContext context) {
     final shiftProvider = context.watch<ShiftProvider>();
     final staffProvider = context.watch<StaffProvider>();
+    final leaveProvider = context.watch<LeaveRequestProvider>();
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
 
     // Le barre della home sono trasparenti: il contenuto fisso deve partire
     // sotto la AppBar e la lista finire oltre la NavigationBar.
     final insets = MediaQuery.paddingOf(context);
 
     final selectedShifts = shiftProvider.shiftsOn(_selectedDay);
-    final now = DateTime.now();
+    final selectedLeaves = leaveProvider.approvedLeavesOn(_selectedDay);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -118,83 +124,16 @@ class _CalendarioTabState extends State<CalendarioTab> {
               ),
             )
           else ...[
-            GlassCard(
-              margin: const EdgeInsets.fromLTRB(
-                AppSpacing.sm,
-                AppSpacing.sm,
-                AppSpacing.sm,
-                0,
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xs,
-                vertical: AppSpacing.xs,
-              ),
-              child: TableCalendar<Shift>(
-                firstDay: now.subtract(const Duration(days: 365 * 2)),
-                lastDay: now.add(const Duration(days: 365 * 2)),
-                focusedDay: _focusedDay,
-                selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
-                onDaySelected: (selected, focused) => setState(() {
-                  _selectedDay = selected;
-                  _focusedDay = focused;
-                }),
-                onPageChanged: (focused) => _focusedDay = focused,
-                startingDayOfWeek: StartingDayOfWeek.monday,
-                // Solo vista mensile: niente pulsante per cambiare formato.
-                availableCalendarFormats: const {CalendarFormat.month: 'Mese'},
-                // Un pallino per ogni turno del giorno (massimo 3).
-                eventLoader: shiftProvider.shiftsOn,
-                headerStyle: HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                  // Testi italiani senza package intl: usiamo i nostri
-                  // formatter al posto di quelli basati sul locale.
-                  titleTextFormatter: (date, _) =>
-                      DateFormatter.monthYear(date),
-                  titleTextStyle: theme.textTheme.titleMedium!,
-                  leftChevronIcon: Icon(
-                    Icons.chevron_left_rounded,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  rightChevronIcon: Icon(
-                    Icons.chevron_right_rounded,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                daysOfWeekStyle: DaysOfWeekStyle(
-                  dowTextFormatter: (date, _) => DateFormatter.dowLetter(date),
-                  weekdayStyle: theme.textTheme.labelMedium!.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  weekendStyle: theme.textTheme.labelMedium!.copyWith(
-                    color: scheme.primary,
-                  ),
-                ),
-                calendarStyle: CalendarStyle(
-                  outsideDaysVisible: false,
-                  todayDecoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: scheme.primary, width: 1.5),
-                  ),
-                  todayTextStyle: TextStyle(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  selectedDecoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: scheme.primary,
-                  ),
-                  selectedTextStyle: TextStyle(
-                    color: scheme.onPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  markerDecoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: scheme.primary,
-                  ),
-                  markersMaxCount: 3,
-                ),
-              ),
+            ShiftCalendar(
+              focusedDay: _focusedDay,
+              selectedDay: _selectedDay,
+              onDaySelected: (selected, focused) => setState(() {
+                _selectedDay = selected;
+                _focusedDay = focused;
+              }),
+              onPageChanged: (focused) => _focusedDay = focused,
+              eventLoader: shiftProvider.shiftsOn,
+              leaveLoader: leaveProvider.approvedLeavesOn,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -209,7 +148,7 @@ class _CalendarioTabState extends State<CalendarioTab> {
               ),
             ),
             Expanded(
-              child: selectedShifts.isEmpty
+              child: (selectedShifts.isEmpty && selectedLeaves.isEmpty)
                   // Il padding tiene il messaggio centrato SOPRA il FAB.
                   ? Padding(
                       padding: EdgeInsets.only(
@@ -217,30 +156,36 @@ class _CalendarioTabState extends State<CalendarioTab> {
                       ),
                       child: const PlaceholderView(
                         icon: Icons.event_busy_rounded,
-                        title: 'Nessun turno in questo giorno',
+                        title: 'Niente in questo giorno',
                         subtitle: 'Tocca + per creare un turno in questa data.',
                       ),
                     )
-                  : ListView.builder(
+                  // Prima le assenze (contesto), poi i turni del giorno.
+                  : ListView(
                       padding: EdgeInsets.fromLTRB(
                         AppSpacing.sm,
                         0,
                         AppSpacing.sm,
                         AppSizes.fabClearance + insets.bottom,
                       ),
-                      itemCount: selectedShifts.length,
-                      itemBuilder: (context, i) {
-                        final shift = selectedShifts[i];
-                        final employeeName =
-                            staffProvider.byUid(shift.employeeUid)?.name ??
-                            'Dipendente';
-                        return _ShiftCard(
-                          shift: shift,
-                          employeeName: employeeName,
-                          onEdit: () => _openForm(existing: shift),
-                          onDelete: () => _confirmDelete(shift),
-                        );
-                      },
+                      children: [
+                        for (final leave in selectedLeaves)
+                          LeaveDayCard(
+                            request: leave,
+                            employeeName:
+                                staffProvider.byUid(leave.employeeUid)?.name ??
+                                'Dipendente',
+                          ),
+                        for (final shift in selectedShifts)
+                          _ShiftCard(
+                            shift: shift,
+                            employeeName:
+                                staffProvider.byUid(shift.employeeUid)?.name ??
+                                'Dipendente',
+                            onEdit: () => _openForm(existing: shift),
+                            onDelete: () => _confirmDelete(shift),
+                          ),
+                      ],
                     ),
             ),
           ],

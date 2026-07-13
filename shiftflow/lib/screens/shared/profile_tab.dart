@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/date_formatter.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/initials_avatar.dart';
+import 'edit_profile_screen.dart';
 
 /// Sezione "Profilo", condivisa tra Dipendente e Responsabile.
 /// Mostra i dati dell'utente loggato (letti da `users/{uid}`) e il logout.
@@ -33,6 +35,10 @@ class _ProfileTabState extends State<ProfileTab> {
     final user = context.watch<AuthProvider>().currentUser;
     final restaurant = context.watch<StaffProvider>().restaurant;
     final theme = Theme.of(context);
+
+    final phone = user?.phone ?? '';
+    final position = user?.position ?? '';
+    final birthDate = user?.birthDate;
 
     // Etichetta leggibile del ruolo.
     final isResponsabile = user?.role == UserRoles.responsabile;
@@ -84,20 +90,36 @@ class _ProfileTabState extends State<ProfileTab> {
               margin: EdgeInsets.zero,
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.email_outlined),
-                    title: const Text('Email'),
-                    subtitle: Text(user?.email ?? '-'),
+                  _infoTile(
+                    icon: Icons.email_outlined,
+                    title: 'Email',
+                    value: user?.email ?? '-',
+                  ),
+                  _divider(theme),
+                  _infoTile(
+                    icon: Icons.phone_outlined,
+                    title: 'Telefono',
+                    value: phone.isEmpty ? 'Non impostato' : phone,
+                    placeholder: phone.isEmpty,
+                  ),
+                  _divider(theme),
+                  _infoTile(
+                    icon: Icons.work_outline_rounded,
+                    title: 'Mansione',
+                    value: position.isEmpty ? 'Non impostata' : position,
+                    placeholder: position.isEmpty,
+                  ),
+                  _divider(theme),
+                  _infoTile(
+                    icon: Icons.cake_outlined,
+                    title: 'Data di nascita',
+                    value: birthDate != null
+                        ? DateFormatter.dayMonthYearFull(birthDate)
+                        : 'Non impostata',
+                    placeholder: birthDate == null,
                   ),
                   if (restaurant != null) ...[
-                    Divider(
-                      height: 1,
-                      indent: AppSpacing.md,
-                      endIndent: AppSpacing.md,
-                      color: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.5,
-                      ),
-                    ),
+                    _divider(theme),
                     ListTile(
                       leading: const Icon(Icons.storefront_outlined),
                       title: const Text('Locale'),
@@ -113,6 +135,14 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
+            FilledButton.tonalIcon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+              ),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Modifica profilo'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
               onPressed: () => context.read<AuthProvider>().signOut(),
               icon: const Icon(Icons.logout_rounded),
@@ -123,4 +153,36 @@ class _ProfileTabState extends State<ProfileTab> {
       ),
     );
   }
+
+  /// Riga informativa della card profilo. Con [placeholder] a `true` il valore
+  /// è un segnaposto ("Non impostato"): lo mostriamo attenuato e in corsivo.
+  Widget _infoTile({
+    required IconData icon,
+    required String title,
+    required String value,
+    bool placeholder = false,
+  }) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: Text(
+        value,
+        style: placeholder
+            ? theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              )
+            : null,
+      ),
+    );
+  }
+
+  /// Sottile separatore tra le righe della card, rientrato ai lati.
+  Widget _divider(ThemeData theme) => Divider(
+    height: 1,
+    indent: AppSpacing.md,
+    endIndent: AppSpacing.md,
+    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+  );
 }

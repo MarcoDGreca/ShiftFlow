@@ -81,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'I turni del tuo locale, che scorrono da soli',
+                      'I turni del tuo locale, al tuo servizio',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,

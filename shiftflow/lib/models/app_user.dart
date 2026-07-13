@@ -18,6 +18,13 @@ class AppUser {
   final String email;
   final String status; // vedi StaffStatus
 
+  // Dati anagrafici modificabili dall'utente stesso (schermata Profilo).
+  // Tutti facoltativi: i profili creati prima della loro introduzione restano
+  // validi (telefono/mansione vuoti, data di nascita assente).
+  final String phone;
+  final String position; // mansione, es. "Cameriere"
+  final DateTime? birthDate;
+
   const AppUser({
     required this.uid,
     required this.restaurantId,
@@ -25,6 +32,9 @@ class AppUser {
     required this.name,
     required this.email,
     this.status = StaffStatus.attivo,
+    this.phone = '',
+    this.position = '',
+    this.birthDate,
   });
 
   /// Costruisce un [AppUser] a partire dal documento Firestore.
@@ -38,6 +48,9 @@ class AppUser {
       email: data['email'] as String? ?? '',
       // I vecchi documenti senza `status` sono considerati attivi.
       status: data['status'] as String? ?? StaffStatus.attivo,
+      phone: data['phone'] as String? ?? '',
+      position: data['position'] as String? ?? '',
+      birthDate: (data['birthDate'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -49,6 +62,9 @@ class AppUser {
     'name': name,
     'email': email,
     'status': status,
+    'phone': phone,
+    'position': position,
+    'birthDate': birthDate != null ? Timestamp.fromDate(birthDate!) : null,
   };
 
   bool get isResponsabile => role == 'responsabile';

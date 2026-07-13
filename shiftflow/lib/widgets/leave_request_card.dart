@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../core/constants/app_constants.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/utils/date_formatter.dart';
 import '../models/leave_request.dart';
@@ -30,12 +29,46 @@ class LeaveRequestCard extends StatelessWidget {
     this.actions,
   });
 
-  bool get _isCambio => request.type == LeaveType.cambioTurno;
+  /// Testo del periodo dell'assenza (per ferie/permesso): intervallo di giorni,
+  /// oppure il giorno + orario del permesso. `null` per il cambio turno (che è
+  /// descritto dal turno collegato) o per le vecchie richieste senza date.
+  String? _period() {
+    if (request.isFerie) {
+      final s = request.startDate, e = request.endDate;
+      if (s == null || e == null) return null;
+      if (DateFormatter.toDayLabel(s) == DateFormatter.toDayLabel(e)) {
+        return DateFormatter.full(s);
+      }
+      return 'Dal ${DateFormatter.full(s)} al ${DateFormatter.full(e)}';
+    }
+    if (request.isPermesso) {
+      final s = request.startDate;
+      if (s == null) return null;
+      final day = DateFormatter.full(s);
+      if (request.startTime != null && request.endTime != null) {
+        return '$day · ${request.startTime}–${request.endTime}';
+      }
+      return '$day · tutto il giorno';
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final reason = request.reason?.trim();
+
+    final IconData typeIcon = request.isCambioTurno
+        ? Icons.swap_horiz_rounded
+        : request.isFerie
+        ? Icons.beach_access_rounded
+        : Icons.more_time_rounded;
+    final String typeLabel = request.isCambioTurno
+        ? 'Cambio turno'
+        : request.isFerie
+        ? 'Ferie'
+        : 'Permesso';
+    final period = _period();
 
     return GlassCard(
       padding: const EdgeInsets.fromLTRB(
@@ -49,18 +82,10 @@ class LeaveRequestCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                _isCambio
-                    ? Icons.swap_horiz_rounded
-                    : Icons.beach_access_rounded,
-                color: theme.colorScheme.primary,
-              ),
+              Icon(typeIcon, color: theme.colorScheme.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: Text(
-                  _isCambio ? 'Cambio turno' : 'Permesso',
-                  style: theme.textTheme.titleMedium,
-                ),
+                child: Text(typeLabel, style: theme.textTheme.titleMedium),
               ),
               RequestStatusChip(status: request.status),
             ],
@@ -68,6 +93,8 @@ class LeaveRequestCard extends StatelessWidget {
           const SizedBox(height: 4),
           if (employeeName != null)
             _InfoLine(icon: Icons.person_outline_rounded, text: employeeName!),
+          if (period != null)
+            _InfoLine(icon: Icons.event_rounded, text: period),
           if (relatedShift != null)
             _InfoLine(
               icon: Icons.event_rounded,

@@ -49,6 +49,21 @@ class DateFormatter {
   static String monthYear(DateTime date) =>
       '${_monthsFull[date.month - 1]} ${date.year}';
 
+  /// Es. `9 luglio 2005` (data per esteso senza giorno della settimana:
+  /// adatta a una data di nascita).
+  static String dayMonthYearFull(DateTime date) =>
+      '${date.day} ${_monthsFull[date.month - 1]} ${date.year}';
+
+  /// Es. `9 lug` (giorno + mese abbreviato, per intervalli compatti).
+  static String dayMonthShort(DateTime date) =>
+      '${date.day} ${_months[date.month - 1]}';
+
+  /// Es. `gio` (giorno della settimana abbreviato, per il badge di una card).
+  static String weekdayShort(DateTime date) => _weekdays[date.weekday - 1];
+
+  /// Es. `lug` (mese abbreviato, per il badge di una card).
+  static String monthShort(DateTime date) => _months[date.month - 1];
+
   /// "HH:mm" -> minuti dalla mezzanotte. `null` se la stringa non è valida.
   static int? _toMinutes(String hhmm) {
     final parts = hhmm.split(':');
