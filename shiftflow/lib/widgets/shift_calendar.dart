@@ -112,6 +112,8 @@ class _ShiftCalendarState extends State<ShiftCalendar> {
             },
             calendarFormat: _format,
             onFormatChanged: (format) => setState(() => _format = format),
+            // L'altezza di default (16) taglia le lettere dei giorni.
+            daysOfWeekHeight: 24,
             eventLoader: widget.eventLoader,
             calendarBuilders: CalendarBuilders<Shift>(
               // Disegniamo noi i pallini: turni (primario) + assenze (colori
@@ -179,6 +181,13 @@ class _ShiftCalendarState extends State<ShiftCalendar> {
             ),
             calendarStyle: CalendarStyle(
               outsideDaysVisible: false,
+              // Colori dei numeri presi dal tema: i grigi di default del
+              // pacchetto stonano in dark mode.
+              defaultTextStyle: TextStyle(color: scheme.onSurface),
+              weekendTextStyle: TextStyle(color: scheme.onSurface),
+              disabledTextStyle: TextStyle(
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
+              ),
               todayDecoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: scheme.primary, width: 1.5),

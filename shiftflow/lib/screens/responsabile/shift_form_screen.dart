@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/date_formatter.dart';
@@ -11,16 +12,16 @@ import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/section_header.dart';
 
 /// Form di creazione/modifica di un turno.
 ///
-/// Se [existing] è `null` crea un nuovo turno, altrimenti modifica quello
-/// passato (campi precompilati). [initialDate] pre-compila la data di un
-/// turno nuovo (es. il giorno selezionato sul calendario). In creazione il
-/// turno può essere **ripetuto ogni settimana** (stesso giorno e orario) per
-/// un numero di settimane a scelta: i turni nascono in un unico batch atomico.
-/// Al salvataggio chiama [ShiftProvider] e, se l'operazione riesce, torna alla
-/// lista: le card compariranno o si aggiorneranno da sole grazie allo stream.
+/// In **creazione** i giorni si scelgono direttamente su un mini-calendario
+/// multi-selezione: tocchi le date in cui il turno vale (anche sparse, anche
+/// su mesi diversi) e nasce un turno per ciascuna, tutte in un unico batch
+/// atomico. In **modifica** si lavora sul singolo turno esistente (campi
+/// precompilati, una sola data). [initialDate] pre-seleziona il giorno da cui
+/// si è partiti sul calendario della home.
 class ShiftFormScreen extends StatefulWidget {
   final Shift? existing;
   final DateTime? initialDate;
@@ -36,12 +37,18 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
   final _notesController = TextEditingController();
 
   String? _employeeUid;
-  DateTime? _date;
   TimeOfDay? _start;
   TimeOfDay? _end;
 
-  /// Quante settimane consecutive coprire: 1 = solo questa (non ripetere).
-  int _repeatWeeks = 1;
+  /// I giorni scelti sul mini-calendario (solo creazione), normalizzati a
+  /// mezzanotte. Un turno per ciascuno.
+  final Set<DateTime> _selectedDays = {};
+
+  /// Il mese mostrato dal mini-calendario.
+  late DateTime _focusedDay = widget.initialDate ?? DateTime.now();
+
+  /// La data del turno in MODIFICA (in creazione si usa [_selectedDays]).
+  DateTime? _date;
 
   bool get _isEditing => widget.existing != null;
 
@@ -56,10 +63,8 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
       _end = _parseTime(existing.endTime);
       _notesController.text = existing.notes ?? '';
     } else if (widget.initialDate != null) {
-      // Turno nuovo dal calendario: data già impostata al giorno selezionato
-      // (normalizzata a mezzanotte: dell'orario si occupano Inizio/Fine).
-      final d = widget.initialDate!;
-      _date = DateTime(d.year, d.month, d.day);
+      // Turno nuovo dal calendario della home: quel giorno parte già scelto.
+      _selectedDays.add(_dateOnly(widget.initialDate!));
     }
   }
 
@@ -68,6 +73,8 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     _notesController.dispose();
     super.dispose();
   }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// "18:30" -> TimeOfDay(18, 30). `null` se la stringa non è valida.
   TimeOfDay? _parseTime(String value) {
@@ -112,6 +119,17 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Aggiunge o toglie un giorno dalla selezione (tocco sul mini-calendario).
+  void _toggleDay(DateTime day) {
+    final normalized = _dateOnly(day);
+    setState(() {
+      if (!_selectedDays.remove(normalized)) _selectedDays.add(normalized);
+    });
+  }
+
+  /// I giorni scelti in ordine cronologico (il Set non ha un ordine suo).
+  List<DateTime> get _sortedDays => _selectedDays.toList()..sort();
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
@@ -122,6 +140,11 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     final endMinutes = _end!.hour * 60 + _end!.minute;
     if (endMinutes == startMinutes) {
       _showSnack("L'ora di fine non può essere uguale all'inizio.");
+      return;
+    }
+
+    if (!_isEditing && _selectedDays.isEmpty) {
+      _showSnack('Tocca sul calendario i giorni in cui vale il turno.');
       return;
     }
 
@@ -150,7 +173,8 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
       // Nome "fotografato" sul documento: sopravvive alla rimozione del
       // dipendente dall'anagrafica (lo storico resta leggibile).
       employeeName: assignee?.name ?? widget.existing?.employeeName ?? '',
-      date: _date!,
+      // In creazione è un segnaposto: ogni turno avrà poi il proprio giorno.
+      date: _date ?? _sortedDays.first,
       startTime: _formatTime(_start!),
       endTime: _formatTime(_end!),
       notes: notes.isEmpty ? null : notes,
@@ -159,7 +183,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
       createdAt: widget.existing?.createdAt,
     );
 
-    // --- Modifica di un turno esistente: percorso semplice, senza ripetizioni.
+    // --- Modifica di un turno esistente: percorso semplice, una sola data.
     if (_isEditing) {
       if (leaveProvider.isOnLeave(shift.employeeUid, shift.date)) {
         _showSnack(
@@ -185,13 +209,12 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
       return;
     }
 
-    // --- Creazione, eventualmente ripetuta ogni settimana. ---
-    // Le occorrenze nei giorni in cui il dipendente è assente (ferie/permesso
-    // approvati) vengono saltate, non create: verranno segnalate alla fine.
+    // --- Creazione: un turno per ogni giorno scelto sul calendario. ---
+    // I giorni in cui il dipendente è assente (ferie/permesso approvati)
+    // vengono saltati, non creati: verranno segnalati alla fine.
     final toCreate = <Shift>[];
     final skipped = <DateTime>[];
-    for (var week = 0; week < _repeatWeeks; week++) {
-      final day = _date!.add(Duration(days: 7 * week));
+    for (final day in _sortedDays) {
       if (leaveProvider.isOnLeave(shift.employeeUid, day)) {
         skipped.add(day);
       } else {
@@ -274,11 +297,36 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     );
   }
 
+  /// Annotazione per la voce del dipendente nel menù: segnala se è assente
+  /// in tutti o in parte dei giorni scelti. Restituisce anche se la voce va
+  /// disabilitata (assente ovunque: non avrebbe senso sceglierlo).
+  (String suffix, bool enabled) _availability(String uid) {
+    final days = _isEditing
+        ? [if (_date != null) _dateOnly(_date!)]
+        : _sortedDays;
+    if (days.isEmpty) return ('', true);
+    final leaveProvider = context.read<LeaveRequestProvider>();
+    final absent = days
+        .where((d) => leaveProvider.isOnLeave(uid, d))
+        .length;
+    if (absent == 0) return ('', true);
+    if (absent == days.length) {
+      return (
+        days.length == 1 ? ' (assente)' : ' (assente nelle date scelte)',
+        false,
+      );
+    }
+    return (' (assente in alcuni giorni)', true);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final staff = context.watch<StaffProvider>().staff;
     final isSaving = context.watch<ShiftProvider>().isSaving;
-    final leaveProvider = context.watch<LeaveRequestProvider>();
+    // Il watch fa ridisegnare il form quando cambiano le assenze approvate
+    // (usate da _availability e dai salti in salvataggio).
+    context.watch<LeaveRequestProvider>();
 
     // Ai nuovi turni si assegnano solo dipendenti attivi; se stiamo MODIFICANDO
     // un turno di qualcuno nel frattempo disattivato, lo teniamo comunque
@@ -296,6 +344,8 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
     // tiene il pulsante sopra la barra gesti su schermi piccoli.
     final viewPadding = MediaQuery.paddingOf(context);
+
+    final count = _selectedDays.length;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -327,34 +377,26 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const SectionHeader(
+                        title: 'Turno',
+                        padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                      ),
                       DropdownButtonFormField<String>(
                         initialValue: employeeValue,
+                        // Senza isExpanded un nome lungo + annotazione
+                        // "(assente...)" sborda dal campo.
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Dipendente',
                           prefixIcon: Icon(Icons.person_outline),
                         ),
                         items: [
                           for (final member in selectable)
-                            // Chi è assente nel giorno scelto (ferie/permesso
-                            // approvati) non è assegnabile: voce disabilitata
-                            // e annotata, così si vede il PERCHÉ.
-                            DropdownMenuItem(
-                              value: member.uid,
-                              enabled:
-                                  _date == null ||
-                                  !leaveProvider.isOnLeave(member.uid, _date!),
-                              child: Text(
-                                member.isDisattivato
-                                    ? '${member.name} (disattivato)'
-                                    : (_date != null &&
-                                          leaveProvider.isOnLeave(
-                                            member.uid,
-                                            _date!,
-                                          ))
-                                    ? '${member.name} (assente)'
-                                    : member.name,
-                              ),
-                            ),
+                            // Voce annotata (ed eventualmente disabilitata)
+                            // se il membro è assente nei giorni scelti:
+                            // si vede subito il PERCHÉ non è assegnabile.
+                            _memberItem(member.uid, member.name,
+                                disattivato: member.isDisattivato),
                         ],
                         onChanged: (uid) => setState(() => _employeeUid = uid),
                         validator: (_) => _employeeUid == null
@@ -362,25 +404,10 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                             : null,
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      // Campo data: readOnly, il valore si sceglie dal date picker.
-                      // `key: ValueKey(_date)` forza la ricostruzione del campo quando
-                      // la data cambia, così l'initialValue si aggiorna.
-                      TextFormField(
-                        key: ValueKey(_date),
-                        readOnly: true,
-                        onTap: _pickDate,
-                        initialValue: _date == null
-                            ? ''
-                            : DateFormatter.full(_date!),
-                        decoration: const InputDecoration(
-                          labelText: 'Data',
-                          prefixIcon: Icon(Icons.calendar_today_rounded),
-                        ),
-                        validator: (_) =>
-                            _date == null ? 'Scegli la data.' : null,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
                       Row(
+                        // Allineati in alto: se solo uno dei due campi mostra
+                        // l'errore di validazione, l'altro non scivola giù.
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: TextFormField(
@@ -417,33 +444,85 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                           ),
                         ],
                       ),
-                      // Ripetizione settimanale: solo in creazione (modificare
-                      // una serie già creata è fuori portata: si modificano i
-                      // singoli turni).
-                      if (!_isEditing) ...[
+
+                      // --- Giorni ---
+                      if (_isEditing) ...[
+                        // In modifica il turno è uno solo: campo data classico.
                         const SizedBox(height: AppSpacing.md),
-                        DropdownButtonFormField<int>(
-                          initialValue: _repeatWeeks,
+                        TextFormField(
+                          key: ValueKey(_date),
+                          readOnly: true,
+                          onTap: _pickDate,
+                          initialValue: _date == null
+                              ? ''
+                              : DateFormatter.full(_date!),
                           decoration: const InputDecoration(
-                            labelText: 'Ripeti ogni settimana',
-                            prefixIcon: Icon(Icons.repeat_rounded),
+                            labelText: 'Data',
+                            prefixIcon: Icon(Icons.calendar_today_rounded),
                           ),
-                          items: [
-                            const DropdownMenuItem(
-                              value: 1,
-                              child: Text('Non ripetere'),
-                            ),
-                            for (var weeks = 2; weeks <= 8; weeks++)
-                              DropdownMenuItem(
-                                value: weeks,
-                                child: Text('Per $weeks settimane'),
-                              ),
-                          ],
-                          onChanged: (weeks) =>
-                              setState(() => _repeatWeeks = weeks ?? 1),
+                          validator: (_) =>
+                              _date == null ? 'Scegli la data.' : null,
                         ),
+                      ] else ...[
+                        SectionHeader(
+                          title: 'Giorni',
+                          trailing: count == 0
+                              ? null
+                              : count == 1
+                              ? '1 giorno'
+                              : '$count giorni',
+                          padding: const EdgeInsets.fromLTRB(
+                            0,
+                            AppSpacing.lg,
+                            0,
+                            AppSpacing.sm,
+                          ),
+                        ),
+                        // Mini-calendario multi-selezione: si toccano
+                        // direttamente i giorni in cui il turno vale, anche
+                        // sparsi e su mesi diversi. Ritoccare = deselezionare.
+                        _MultiDayCalendar(
+                          focusedDay: _focusedDay,
+                          selectedDays: _selectedDays,
+                          onDayToggled: _toggleDay,
+                          onPageChanged: (focused) => _focusedDay = focused,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        if (count == 0)
+                          Text(
+                            'Tocca i giorni in cui vale il turno.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          )
+                        else
+                          // Riepilogo rimovibile: ogni chip è un giorno; la X
+                          // lo toglie senza dover tornare al mese giusto.
+                          Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              for (final day in _sortedDays)
+                                InputChip(
+                                  label: Text(
+                                    DateFormatter.dayMonthShort(day),
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  onDeleted: () => _toggleDay(day),
+                                ),
+                            ],
+                          ),
                       ],
-                      const SizedBox(height: AppSpacing.md),
+
+                      const SectionHeader(
+                        title: 'Note',
+                        padding: EdgeInsets.fromLTRB(
+                          0,
+                          AppSpacing.lg,
+                          0,
+                          AppSpacing.sm,
+                        ),
+                      ),
                       TextFormField(
                         controller: _notesController,
                         maxLines: 3,
@@ -468,8 +547,8 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                             : Text(
                                 _isEditing
                                     ? 'Salva modifiche'
-                                    : _repeatWeeks > 1
-                                    ? 'Crea $_repeatWeeks turni'
+                                    : count > 1
+                                    ? 'Crea $count turni'
                                     : 'Crea turno',
                               ),
                       ),
@@ -478,6 +557,130 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Voce del menù dipendente con l'annotazione di disponibilità.
+  DropdownMenuItem<String> _memberItem(
+    String uid,
+    String name, {
+    required bool disattivato,
+  }) {
+    final (suffix, available) = _availability(uid);
+    return DropdownMenuItem(
+      value: uid,
+      enabled: available,
+      child: Text(
+        disattivato ? '$name (disattivato)' : '$name$suffix',
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+/// Mini-calendario mensile con selezione MULTIPLA dei giorni: un tocco
+/// seleziona, un altro deseleziona. Stessi codici visivi del calendario
+/// della home (oggi cerchiato, selezionato pieno), in formato compatto da
+/// dentro-form.
+class _MultiDayCalendar extends StatelessWidget {
+  final DateTime focusedDay;
+  final Set<DateTime> selectedDays;
+  final ValueChanged<DateTime> onDayToggled;
+  final ValueChanged<DateTime> onPageChanged;
+
+  const _MultiDayCalendar({
+    required this.focusedDay,
+    required this.selectedDays,
+    required this.onDayToggled,
+    required this.onPageChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final now = DateTime.now();
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.xs,
+      ),
+      child: TableCalendar<void>(
+        // Stesso intervallo del calendario della home: se il form si apre da
+        // un giorno lontano, il focusedDay deve comunque cadere nei limiti.
+        firstDay: now.subtract(const Duration(days: 365 * 2)),
+        lastDay: now.add(const Duration(days: 365 * 2)),
+        focusedDay: focusedDay,
+        onPageChanged: onPageChanged,
+        startingDayOfWeek: StartingDayOfWeek.monday,
+        availableCalendarFormats: const {CalendarFormat.month: 'Mese'},
+        // Il calendario vive dentro un form scrollabile: si tiene solo lo
+        // swipe orizzontale (cambio mese), il trascinamento verticale deve
+        // far scorrere la pagina, non essere inghiottito dal calendario.
+        availableGestures: AvailableGestures.horizontalSwipe,
+        rowHeight: 44,
+        // L'altezza di default (16) taglia le lettere dei giorni.
+        daysOfWeekHeight: 24,
+        // Multi-selezione: "selezionato" è qualunque giorno nel Set; il tocco
+        // commuta (il genitore aggiorna il Set e ricostruisce).
+        selectedDayPredicate: (day) =>
+            selectedDays.any((d) => isSameDay(d, day)),
+        onDaySelected: (selected, _) => onDayToggled(selected),
+        headerStyle: HeaderStyle(
+          formatButtonVisible: false,
+          titleCentered: true,
+          titleTextFormatter: (date, _) => DateFormatter.monthYear(date),
+          titleTextStyle: theme.textTheme.titleSmall!,
+          leftChevronIcon: Icon(
+            Icons.chevron_left_rounded,
+            color: scheme.onSurfaceVariant,
+          ),
+          rightChevronIcon: Icon(
+            Icons.chevron_right_rounded,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        daysOfWeekStyle: DaysOfWeekStyle(
+          dowTextFormatter: (date, _) => DateFormatter.dowLetter(date),
+          weekdayStyle: theme.textTheme.labelSmall!.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+          weekendStyle: theme.textTheme.labelSmall!.copyWith(
+            color: scheme.primary,
+          ),
+        ),
+        calendarStyle: CalendarStyle(
+          outsideDaysVisible: false,
+          // Colori dei numeri presi dal tema: i grigi di default del
+          // pacchetto stonano in dark mode.
+          defaultTextStyle: TextStyle(color: scheme.onSurface),
+          weekendTextStyle: TextStyle(color: scheme.onSurface),
+          disabledTextStyle: TextStyle(
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
+          todayDecoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: scheme.primary, width: 1.5),
+          ),
+          todayTextStyle: TextStyle(
+            color: scheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+          selectedDecoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: scheme.primary,
+          ),
+          selectedTextStyle: TextStyle(
+            color: scheme.onPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
