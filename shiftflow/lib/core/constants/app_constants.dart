@@ -50,4 +50,7 @@ class LeaveStatus {
   static const String approvata = 'approvata';
   static const String rifiutata = 'rifiutata';
   static const String annullata = 'annullata'; // ritirata dal dipendente
+  // Chiusa d'ufficio perché il dipendente è stato disattivato (UC5-E2), mentre
+  // era ancora in attesa. Da riportare nel diagramma di stato del RAD (Fig. 5).
+  static const String decaduta = 'decaduta';
 }

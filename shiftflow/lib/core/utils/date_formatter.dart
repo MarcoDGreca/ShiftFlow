@@ -58,6 +58,12 @@ class DateFormatter {
   static String dayMonthShort(DateTime date) =>
       '${date.day} ${_months[date.month - 1]}';
 
+  /// Es. `9 lug alle 14:30` (data + ora, per "ultimo aggiornamento").
+  static String dateTimeLabel(DateTime date) =>
+      '${dayMonthShort(date)} alle '
+      '${date.hour.toString().padLeft(2, '0')}:'
+      '${date.minute.toString().padLeft(2, '0')}';
+
   /// Es. `gio` (giorno della settimana abbreviato, per il badge di una card).
   static String weekdayShort(DateTime date) => _weekdays[date.weekday - 1];
 

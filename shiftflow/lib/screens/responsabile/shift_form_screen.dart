@@ -117,6 +117,24 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
       return;
     }
 
+    // UC1-E4: il destinatario potrebbe essere stato disattivato dopo l'apertura
+    // della schermata (lo stato dello staff è in ascolto in tempo reale).
+    // Blocchiamo solo una vera ASSEGNAZIONE — turno nuovo o assegnatario
+    // cambiato — a un membro disattivato; modificare un turno già suo è ammesso.
+    final assignee = context.read<StaffProvider>().byUid(_employeeUid!);
+    final isNewAssignment =
+        !_isEditing || _employeeUid != widget.existing!.employeeUid;
+    if (isNewAssignment && (assignee?.isDisattivato ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Questo dipendente è stato disattivato: scegline un altro.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final currentUser = context.read<AuthProvider>().currentUser;
     if (currentUser == null) return;
 

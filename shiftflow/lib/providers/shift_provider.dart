@@ -30,6 +30,7 @@ class ShiftProvider extends ChangeNotifier {
   String? _errorMessage;
   bool _isFromCache = false;
   bool _hasPendingWrites = false;
+  DateTime? _lastSyncedAt;
 
   List<Shift> get shifts => List.unmodifiable(_shifts);
   bool get isLoading => _isLoading;
@@ -38,6 +39,10 @@ class ShiftProvider extends ChangeNotifier {
 
   /// I turni mostrati arrivano dalla cache locale (tipicamente offline).
   bool get isFromCache => _isFromCache;
+
+  /// Quando sono arrivati per l'ultima volta dati dal SERVER (non dalla cache).
+  /// È la "data dell'ultimo aggiornamento" da mostrare offline (UC2-E1).
+  DateTime? get lastSyncedAt => _lastSyncedAt;
 
   /// Ci sono scritture locali non ancora sincronizzate col server (§7.1).
   bool get hasPendingWrites => _hasPendingWrites;
@@ -96,6 +101,8 @@ class ShiftProvider extends ChangeNotifier {
     _restaurantId = restaurantId;
     _isLoading = true;
     _errorMessage = null;
+    // Sorgente nuova: azzeriamo il timestamp finché non arrivano dati freschi.
+    _lastSyncedAt = null;
     notifyListeners();
 
     _subscription = source().listen(
@@ -103,6 +110,9 @@ class ShiftProvider extends ChangeNotifier {
         _shifts = view.shifts;
         _isFromCache = view.isFromCache;
         _hasPendingWrites = view.hasPendingWrites;
+        // Dati confermati dal server (non dalla cache): aggiorniamo il momento
+        // dell'ultima sincronizzazione da mostrare quando si va offline.
+        if (!view.isFromCache) _lastSyncedAt = DateTime.now();
         _isLoading = false;
         notifyListeners();
       },
@@ -126,6 +136,29 @@ class ShiftProvider extends ChangeNotifier {
 
   Future<bool> deleteShift(String shiftId) =>
       _mutate((rid) => _shiftService.deleteShift(rid, shiftId));
+
+  /// I turni dei colleghi in servizio nello stesso turno del [shift] (UC2):
+  /// altri turni del locale, lo stesso giorno, con orario che si sovrappone.
+  /// Lettura singola: non modifica lo stato. Restituisce lista vuota se non
+  /// c'è un locale attivo o non ci sono colleghi in servizio.
+  Future<List<Shift>> coworkersFor(Shift shift) async {
+    final rid = _restaurantId;
+    if (rid == null) return [];
+    final dayShifts = await _shiftService.fetchShiftsOnDate(rid, shift.date);
+    return dayShifts
+        .where(
+          (s) =>
+              s.id != shift.id &&
+              s.employeeUid != shift.employeeUid &&
+              ShiftService.timesOverlap(
+                shift.startTime,
+                shift.endTime,
+                s.startTime,
+                s.endTime,
+              ),
+        )
+        .toList();
+  }
 
   /// Cerca una sovrapposizione per il turno indicato (§7.3). Sola lettura:
   /// restituisce il turno in conflitto o `null`. Non modifica lo stato.

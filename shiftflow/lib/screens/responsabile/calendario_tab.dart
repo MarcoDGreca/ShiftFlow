@@ -102,6 +102,19 @@ class _CalendarioTabState extends State<CalendarioTab> {
     final selectedShifts = shiftProvider.shiftsOn(_selectedDay);
     final selectedLeaves = leaveProvider.approvedLeavesOn(_selectedDay);
 
+    // I turni futuri di un membro disattivato vanno segnalati "da riassegnare"
+    // (UC5, flusso alternativo). Tutti i turni mostrati sono del giorno scelto:
+    // basta sapere se quel giorno è da oggi in poi.
+    final now = DateTime.now();
+    final selectedDay = DateTime(
+      _selectedDay.year,
+      _selectedDay.month,
+      _selectedDay.day,
+    );
+    final selectedIsFuture = !selectedDay.isBefore(
+      DateTime(now.year, now.month, now.day),
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Column(
@@ -111,6 +124,7 @@ class _CalendarioTabState extends State<CalendarioTab> {
           SyncStatusBanner(
             isFromCache: shiftProvider.isFromCache,
             hasPendingWrites: shiftProvider.hasPendingWrites,
+            lastUpdated: shiftProvider.lastSyncedAt,
           ),
           if (shiftProvider.isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
@@ -182,6 +196,13 @@ class _CalendarioTabState extends State<CalendarioTab> {
                             employeeName:
                                 staffProvider.byUid(shift.employeeUid)?.name ??
                                 'Dipendente',
+                            // Turno futuro di un membro disattivato: da riassegnare.
+                            needsReassign:
+                                selectedIsFuture &&
+                                (staffProvider
+                                        .byUid(shift.employeeUid)
+                                        ?.isDisattivato ??
+                                    false),
                             onEdit: () => _openForm(existing: shift),
                             onDelete: () => _confirmDelete(shift),
                           ),
@@ -210,6 +231,10 @@ class _CalendarioTabState extends State<CalendarioTab> {
 class _ShiftCard extends StatelessWidget {
   final Shift shift;
   final String employeeName;
+
+  /// Turno futuro di un dipendente disattivato: mostra "Da riassegnare" (UC5).
+  final bool needsReassign;
+
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -218,6 +243,7 @@ class _ShiftCard extends StatelessWidget {
     required this.employeeName,
     required this.onEdit,
     required this.onDelete,
+    this.needsReassign = false,
   });
 
   @override
@@ -248,6 +274,10 @@ class _ShiftCard extends StatelessWidget {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
+                if (needsReassign) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  _ReassignChip(),
+                ],
               ],
             ),
           ),
@@ -267,6 +297,42 @@ class _ShiftCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Etichetta di avviso su un turno futuro assegnato a un membro disattivato:
+/// il responsabile dovrebbe riassegnarlo (UC5, flusso alternativo).
+class _ReassignChip extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final statusColors = Theme.of(context).statusColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: statusColors.warningContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 14,
+            color: statusColors.onWarningContainer,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            'Da riassegnare',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: statusColors.onWarningContainer,
+            ),
           ),
         ],
       ),

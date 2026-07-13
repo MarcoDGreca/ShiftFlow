@@ -147,7 +147,9 @@ class _ApproveShiftSheetState extends State<_ApproveShiftSheet> {
                   value: ShiftResolution.remove,
                   contentPadding: EdgeInsets.zero,
                   title: Text('Elimina il turno'),
-                  subtitle: Text('Il turno viene rimosso dal calendario.'),
+                  // UC4-E2: segnaliamo la scopertura senza impedirla (la scelta
+                  // resta del responsabile).
+                  subtitle: Text('Il turno resterà scoperto: nessuno lo lavora.'),
                 ),
               ],
             ),

@@ -16,6 +16,13 @@ class RestaurantService {
           .doc(restaurantId)
           .collection(FirestoreCollections.staff);
 
+  /// Riferimento alla subcollection delle richieste di un locale.
+  CollectionReference<Map<String, dynamic>> _leaveRef(String restaurantId) =>
+      _db
+          .collection(FirestoreCollections.restaurants)
+          .doc(restaurantId)
+          .collection(FirestoreCollections.leaveRequests);
+
   /// Legge i dati di un locale.
   Future<Restaurant?> getRestaurant(String restaurantId) async {
     final doc = await _db
@@ -50,14 +57,41 @@ class RestaurantService {
   /// La disattivazione è "soft": il documento resta (turni e storico intatti),
   /// ma il membro viene escluso dall'assegnazione di nuovi turni. È preferibile
   /// alla rimozione, che è definitiva.
+  ///
+  /// UC5-E2: al momento della disattivazione, le richieste ancora "in attesa"
+  /// del membro vengono chiuse come "decadute" (non hanno più effetto). Lo
+  /// stato del membro e la chiusura delle richieste avvengono in un unico
+  /// batch atomico: o riescono entrambi o nessuno.
   Future<void> setStaffActive(
     String restaurantId,
     String uid, {
     required bool active,
   }) async {
-    await _staffRef(restaurantId).doc(uid).update({
-      'status': active ? StaffStatus.attivo : StaffStatus.disattivato,
-    });
+    final staffRef = _staffRef(restaurantId).doc(uid);
+
+    // Riattivazione: nessuna richiesta da toccare.
+    if (active) {
+      await staffRef.update({'status': StaffStatus.attivo});
+      return;
+    }
+
+    // Disattivazione: filtriamo le richieste in attesa in memoria (una sola
+    // condizione di uguaglianza nella query = nessun indice composito).
+    final requests = await _leaveRef(
+      restaurantId,
+    ).where('employeeUid', isEqualTo: uid).get();
+
+    final batch = _db.batch();
+    batch.update(staffRef, {'status': StaffStatus.disattivato});
+    for (final doc in requests.docs) {
+      if (doc.data()['status'] == LeaveStatus.inAttesa) {
+        batch.update(doc.reference, {
+          'status': LeaveStatus.decaduta,
+          'resolvedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+    await batch.commit();
   }
 
   /// Rimuove un membro dall'anagrafica del locale.

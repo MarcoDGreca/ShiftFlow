@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_status_colors.dart';
+import '../core/utils/date_formatter.dart';
 
 /// Striscia informativa sullo stato di sincronizzazione dei dati (RNF4 / §7.1).
 ///
@@ -11,10 +12,15 @@ class SyncStatusBanner extends StatelessWidget {
   final bool isFromCache;
   final bool hasPendingWrites;
 
+  /// Quando i dati sono stati sincronizzati col server l'ultima volta: mostrata
+  /// quando si è offline, così l'utente sa quanto sono aggiornati (UC2-E1).
+  final DateTime? lastUpdated;
+
   const SyncStatusBanner({
     super.key,
     required this.isFromCache,
     required this.hasPendingWrites,
+    this.lastUpdated,
   });
 
   @override
@@ -34,7 +40,11 @@ class SyncStatusBanner extends StatelessWidget {
           )
         : (
             Icons.cloud_off_rounded,
-            'Offline · dati dalla memoria locale',
+            // Offline: se sappiamo quando i dati sono stati sincronizzati
+            // l'ultima volta, lo mostriamo (UC2-E1).
+            lastUpdated != null
+                ? 'Offline · ultimo aggiornamento ${DateFormatter.dateTimeLabel(lastUpdated!)}'
+                : 'Offline · dati dalla memoria locale',
             statusColors.infoContainer,
             statusColors.onInfoContainer,
           );

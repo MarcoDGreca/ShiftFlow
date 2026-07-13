@@ -7,12 +7,14 @@ import '../../models/shift.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
+import '../../providers/staff_provider.dart';
 import '../../widgets/async_state_view.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/leave_day_card.dart';
 import '../../widgets/placeholder_view.dart';
 import '../../widgets/shift_calendar.dart';
 import '../../widgets/sync_status_banner.dart';
+import 'shift_detail_sheet.dart';
 
 /// Sezione "I miei turni" del Dipendente. Due modi di guardare gli stessi
 /// turni (solo i propri, RF9):
@@ -59,6 +61,10 @@ class _TurniTabState extends State<TurniTab> {
           user.restaurantId,
           user.uid,
         );
+        // Anagrafica del locale: serve solo a tradurre in nomi gli uid dei
+        // colleghi mostrati nel dettaglio di un turno (UC2). Le regole
+        // consentono a un membro di leggere lo staff del proprio locale.
+        context.read<StaffProvider>().listenForRestaurant(user.restaurantId);
       }
     });
   }
@@ -85,6 +91,7 @@ class _TurniTabState extends State<TurniTab> {
         SyncStatusBanner(
           isFromCache: shiftProvider.isFromCache,
           hasPendingWrites: shiftProvider.hasPendingWrites,
+          lastUpdated: shiftProvider.lastSyncedAt,
         ),
         // Interruttore Lista / Calendario: stesso dato, due viste.
         Padding(
@@ -182,7 +189,10 @@ class _TurniTabState extends State<TurniTab> {
                 AppSpacing.md + insets.bottom,
               ),
               itemCount: visibili.length,
-              itemBuilder: (context, i) => _ShiftCard(shift: visibili[i]),
+              itemBuilder: (context, i) => _ShiftCard(
+                shift: visibili[i],
+                onTap: () => showShiftDetailSheet(context, visibili[i]),
+              ),
             ),
           ),
         ),
@@ -257,7 +267,11 @@ class _TurniTabState extends State<TurniTab> {
                     for (final leave in selectedLeaves)
                       LeaveDayCard(request: leave),
                     for (final shift in selectedShifts)
-                      _ShiftCard(shift: shift, showDate: false),
+                      _ShiftCard(
+                        shift: shift,
+                        showDate: false,
+                        onTap: () => showShiftDetailSheet(context, shift),
+                      ),
                   ],
                 ),
         ),
@@ -276,7 +290,10 @@ class _ShiftCard extends StatelessWidget {
   /// è già indicato dall'intestazione sopra la lista.
   final bool showDate;
 
-  const _ShiftCard({required this.shift, this.showDate = true});
+  /// Tocco sulla card: apre il dettaglio del turno (colleghi inclusi, UC2).
+  final VoidCallback? onTap;
+
+  const _ShiftCard({required this.shift, this.showDate = true, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -297,6 +314,7 @@ class _ShiftCard extends StatelessWidget {
           );
 
     return GlassCard(
+      onTap: onTap,
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [

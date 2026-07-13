@@ -38,6 +38,11 @@ class RequestStatusChip extends StatelessWidget {
         icon = Icons.block_rounded;
         background = scheme.surfaceContainerHighest;
         foreground = scheme.onSurfaceVariant;
+      case LeaveStatus.decaduta:
+        label = 'Decaduta';
+        icon = Icons.event_busy_rounded;
+        background = scheme.surfaceContainerHighest;
+        foreground = scheme.onSurfaceVariant;
       default: // in_attesa
         label = 'In attesa';
         icon = Icons.hourglass_top_rounded;

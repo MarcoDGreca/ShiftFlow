@@ -75,6 +75,22 @@ class ShiftService {
     ).snapshots(includeMetadataChanges: true).map(_view);
   }
 
+  /// Turni del locale in un dato giorno (qualunque dipendente), lettura singola.
+  /// Serve a mostrare al Dipendente i colleghi in servizio nel suo stesso turno
+  /// (UC2). Query per intervallo su un solo campo: nessun indice composito.
+  Future<List<Shift>> fetchShiftsOnDate(
+    String restaurantId,
+    DateTime day,
+  ) async {
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+    final snap = await _shiftsRef(restaurantId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
+        .get();
+    return _sorted(snap.docs.map(Shift.fromFirestore).toList());
+  }
+
   Future<void> createShift(String restaurantId, Shift shift) async {
     await _shiftsRef(restaurantId).add(shift.toFirestore());
   }
