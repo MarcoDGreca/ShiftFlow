@@ -161,6 +161,9 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     final request = LeaveRequest(
       id: '',
       employeeUid: user.uid,
+      // Nome "fotografato" sulla richiesta: lo storico resta leggibile anche
+      // se in futuro il dipendente viene rimosso dall'anagrafica.
+      employeeName: user.name,
       type: _type,
       relatedShiftId: relatedShiftId,
       reason: reason.isEmpty ? null : reason,

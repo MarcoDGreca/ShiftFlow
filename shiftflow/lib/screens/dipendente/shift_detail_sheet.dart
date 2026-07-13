@@ -107,13 +107,8 @@ class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            DateFormatter.full(shift.date),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          // Niente riga con la data qui sotto: c'è già il badge a sinistra
+          // dell'orario (evitiamo le date doppie).
           if (shift.notes != null && shift.notes!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             _InfoRow(icon: Icons.notes_rounded, text: shift.notes!),
@@ -148,14 +143,23 @@ class _ShiftDetailSheetState extends State<_ShiftDetailSheet> {
               }
               return Column(
                 children: [
+                  // Nome "vivo" dall'anagrafica se c'è; altrimenti quello
+                  // fotografato sul turno (collega rimosso dal locale).
                   for (final c in coworkers)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: InitialsAvatar(
-                        name: staffProvider.byUid(c.employeeUid)?.name,
+                        name:
+                            staffProvider.byUid(c.employeeUid)?.name ??
+                            (c.employeeName.isNotEmpty
+                                ? c.employeeName
+                                : null),
                       ),
                       title: Text(
-                        staffProvider.byUid(c.employeeUid)?.name ?? 'Collega',
+                        staffProvider.byUid(c.employeeUid)?.name ??
+                            (c.employeeName.isNotEmpty
+                                ? c.employeeName
+                                : 'Collega'),
                       ),
                       subtitle: Text(
                         DateFormatter.timeRange(c.startTime, c.endTime),

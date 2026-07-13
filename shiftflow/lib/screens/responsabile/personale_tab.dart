@@ -5,7 +5,9 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_status_colors.dart';
 import '../../core/utils/dialogs.dart';
 import '../../models/app_user.dart';
+import '../../models/leave_request.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/leave_request_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/async_state_view.dart';
 import '../../widgets/glass_container.dart';
@@ -35,6 +37,11 @@ class _PersonaleTabState extends State<PersonaleTab> {
       final user = context.read<AuthProvider>().currentUser;
       if (user != null) {
         context.read<StaffProvider>().listenForRestaurant(user.restaurantId);
+        // Le assenze approvate alimentano la pillola "In ferie/permesso"
+        // accanto ai membri assenti oggi (sottoscrizione idempotente).
+        context.read<LeaveRequestProvider>().listenForRestaurant(
+          user.restaurantId,
+        );
       }
     });
   }
@@ -129,6 +136,7 @@ class _PersonaleTabState extends State<PersonaleTab> {
   @override
   Widget build(BuildContext context) {
     final staffProvider = context.watch<StaffProvider>();
+    final leaveProvider = context.watch<LeaveRequestProvider>();
     final currentUid = context.watch<AuthProvider>().currentUser?.uid;
 
     // Le barre della home sono trasparenti: la lista parte sotto la AppBar
@@ -175,6 +183,9 @@ class _PersonaleTabState extends State<PersonaleTab> {
           final manageable = !member.isResponsabile && member.uid != currentUid;
           return _MemberCard(
             member: member,
+            // Assenza approvata che copre OGGI: alimenta la pillola
+            // "In ferie/permesso" (stato derivato: scade da solo).
+            todayLeave: leaveProvider.leaveFor(member.uid, DateTime.now()),
             trailing: manageable ? _memberMenu(member) : _roleChip(member),
           );
         },
@@ -211,14 +222,20 @@ class _PersonaleTabState extends State<PersonaleTab> {
   }
 }
 
-/// Riga di un membro del personale. Un membro disattivato si riconosce
-/// a colpo d'occhio: avatar attenuato e una pillola "Disattivato" accanto
-/// al nome (lo stato non va cercato dentro al testo).
+/// Riga di un membro del personale. Lo stato si legge a colpo d'occhio, senza
+/// cercarlo dentro al testo: avatar attenuato e pillola "Disattivato" per chi
+/// è disattivato; pillola "In ferie"/"In permesso" per chi è assente oggi
+/// ([todayLeave]) — tornerà normale da sola alla fine del periodo.
 class _MemberCard extends StatelessWidget {
   final AppUser member;
+  final LeaveRequest? todayLeave;
   final Widget trailing;
 
-  const _MemberCard({required this.member, required this.trailing});
+  const _MemberCard({
+    required this.member,
+    required this.trailing,
+    this.todayLeave,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -248,6 +265,21 @@ class _MemberCard extends StatelessWidget {
                 label: 'Disattivato',
                 background: statusColors.warningContainer,
                 foreground: statusColors.onWarningContainer,
+              )
+            else if (todayLeave != null)
+              // Stessi colori semantici del resto dell'app: ferie = info,
+              // permesso = attenzione.
+              InfoPill(
+                icon: todayLeave!.isFerie
+                    ? Icons.beach_access_rounded
+                    : Icons.more_time_rounded,
+                label: todayLeave!.isFerie ? 'In ferie' : 'In permesso',
+                background: todayLeave!.isFerie
+                    ? statusColors.infoContainer
+                    : statusColors.warningContainer,
+                foreground: todayLeave!.isFerie
+                    ? statusColors.onInfoContainer
+                    : statusColors.onWarningContainer,
               ),
           ],
         ),

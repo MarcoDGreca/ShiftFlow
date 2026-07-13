@@ -44,7 +44,11 @@ class LeaveRequestCard extends StatelessWidget {
       if (DateFormatter.toDayLabel(s) == DateFormatter.toDayLabel(e)) {
         return DateFormatter.full(s);
       }
-      return 'Dal ${DateFormatter.full(s)} al ${DateFormatter.full(e)}';
+      // Intervallo compatto con il conteggio dei giorni: "9 lug – 11 lug
+      // 2026 · 3 giorni" si legge meglio di due date per esteso.
+      final days = e.difference(s).inDays + 1;
+      return '${DateFormatter.dayMonthShort(s)} – '
+          '${DateFormatter.dayMonthShort(e)} ${e.year} · $days giorni';
     }
     if (request.isPermesso) {
       final s = request.startDate;

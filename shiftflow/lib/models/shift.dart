@@ -8,6 +8,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Shift {
   final String id;
   final String employeeUid;
+
+  /// Nome del dipendente "fotografato" alla creazione (denormalizzazione).
+  ///
+  /// L'anagrafica (`staff/{uid}`) può sparire quando un membro viene rimosso
+  /// dal locale: senza questa copia lo storico non saprebbe più chi ha
+  /// lavorato il turno. Il nome "vivo" dall'anagrafica resta preferito quando
+  /// disponibile (segue eventuali rinomine); questo è il paracadute.
+  final String employeeName;
+
   final DateTime date;
   final String startTime;
   final String endTime;
@@ -18,6 +27,7 @@ class Shift {
   const Shift({
     required this.id,
     required this.employeeUid,
+    this.employeeName = '',
     required this.date,
     required this.startTime,
     required this.endTime,
@@ -31,6 +41,7 @@ class Shift {
     return Shift(
       id: doc.id,
       employeeUid: data['employeeUid'] as String? ?? '',
+      employeeName: data['employeeName'] as String? ?? '',
       date: (data['date'] as Timestamp?)?.toDate() ?? DateTime(1970),
       startTime: data['startTime'] as String? ?? '',
       endTime: data['endTime'] as String? ?? '',
@@ -42,6 +53,7 @@ class Shift {
 
   Map<String, dynamic> toFirestore() => {
     'employeeUid': employeeUid,
+    'employeeName': employeeName,
     'date': Timestamp.fromDate(date),
     'startTime': startTime,
     'endTime': endTime,
@@ -51,4 +63,18 @@ class Shift {
         ? Timestamp.fromDate(createdAt!)
         : FieldValue.serverTimestamp(),
   };
+
+  /// Copia del turno con data diversa: serve alla ripetizione settimanale
+  /// (stesso turno spostato di 7, 14, … giorni).
+  Shift copyWithDate(DateTime newDate) => Shift(
+    id: id,
+    employeeUid: employeeUid,
+    employeeName: employeeName,
+    date: newDate,
+    startTime: startTime,
+    endTime: endTime,
+    notes: notes,
+    createdBy: createdBy,
+    createdAt: createdAt,
+  );
 }

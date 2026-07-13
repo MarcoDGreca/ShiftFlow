@@ -18,6 +18,12 @@ enum ShiftResolution { keep, reassign, remove }
 class LeaveRequest {
   final String id;
   final String employeeUid;
+
+  /// Nome del richiedente "fotografato" all'invio (denormalizzazione): come
+  /// per i turni, lo storico resta leggibile anche se il dipendente viene
+  /// rimosso dall'anagrafica del locale.
+  final String employeeName;
+
   final String type;
   final String? relatedShiftId;
   final String? reason;
@@ -38,6 +44,7 @@ class LeaveRequest {
   const LeaveRequest({
     required this.id,
     required this.employeeUid,
+    this.employeeName = '',
     required this.type,
     this.relatedShiftId,
     this.reason,
@@ -72,6 +79,7 @@ class LeaveRequest {
     return LeaveRequest(
       id: doc.id,
       employeeUid: data['employeeUid'] as String? ?? '',
+      employeeName: data['employeeName'] as String? ?? '',
       type: data['type'] as String? ?? '',
       relatedShiftId: data['relatedShiftId'] as String?,
       reason: data['reason'] as String?,
@@ -88,6 +96,7 @@ class LeaveRequest {
 
   Map<String, dynamic> toFirestore() => {
     'employeeUid': employeeUid,
+    'employeeName': employeeName,
     'type': type,
     'relatedShiftId': relatedShiftId,
     'reason': reason,

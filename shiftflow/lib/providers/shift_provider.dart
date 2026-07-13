@@ -131,6 +131,27 @@ class ShiftProvider extends ChangeNotifier {
   Future<bool> createShift(Shift shift) =>
       _mutate((rid) => _shiftService.createShift(rid, shift));
 
+  /// Crea più turni in un batch atomico (ripetizione settimanale).
+  Future<bool> createShifts(List<Shift> shifts) =>
+      _mutate((rid) => _shiftService.createShifts(rid, shifts));
+
+  /// I turni di un dipendente che cadono nell'intervallo di giorni indicato
+  /// (estremi inclusi, confronto per anno/mese/giorno). Serve all'approvazione
+  /// di ferie/permessi per sapere quali turni verranno eliminati.
+  List<Shift> shiftsForEmployeeInRange(
+    String employeeUid,
+    DateTime start,
+    DateTime end,
+  ) {
+    final s = DateTime(start.year, start.month, start.day);
+    final e = DateTime(end.year, end.month, end.day);
+    return _shifts.where((shift) {
+      if (shift.employeeUid != employeeUid) return false;
+      final d = DateTime(shift.date.year, shift.date.month, shift.date.day);
+      return !d.isBefore(s) && !d.isAfter(e);
+    }).toList();
+  }
+
   Future<bool> updateShift(Shift shift) =>
       _mutate((rid) => _shiftService.updateShift(rid, shift));
 

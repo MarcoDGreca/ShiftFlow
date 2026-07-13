@@ -95,6 +95,17 @@ class ShiftService {
     await _shiftsRef(restaurantId).add(shift.toFirestore());
   }
 
+  /// Crea più turni in un colpo solo (ripetizione settimanale) con un batch
+  /// atomico: o vengono creati tutti o nessuno. Così una rete che cade a metà
+  /// non lascia la serie "a buchi".
+  Future<void> createShifts(String restaurantId, List<Shift> shifts) async {
+    final batch = _db.batch();
+    for (final shift in shifts) {
+      batch.set(_shiftsRef(restaurantId).doc(), shift.toFirestore());
+    }
+    await batch.commit();
+  }
+
   Future<void> updateShift(String restaurantId, Shift shift) async {
     await _shiftsRef(restaurantId).doc(shift.id).update(shift.toFirestore());
   }

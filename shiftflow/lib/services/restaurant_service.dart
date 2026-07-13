@@ -94,13 +94,48 @@ class RestaurantService {
     await batch.commit();
   }
 
+  /// Riferimento alla subcollection dei turni di un locale.
+  CollectionReference<Map<String, dynamic>> _shiftsRef(String restaurantId) =>
+      _db
+          .collection(FirestoreCollections.restaurants)
+          .doc(restaurantId)
+          .collection(FirestoreCollections.shifts);
+
   /// Rimuove un membro dall'anagrafica del locale.
   ///
-  /// Limite noto (accettato per ora): elimina solo `staff/{uid}`. L'account
-  /// Auth e il documento `users/{uid}` del dipendente non si possono toccare
-  /// dal client di un altro utente; una rimozione completa richiederebbe un
-  /// backend (Cloud Functions + Admin SDK).
-  Future<void> removeStaff(String restaurantId, String uid) async {
-    await _staffRef(restaurantId).doc(uid).delete();
+  /// Prima di cancellare `staff/{uid}` scrive il [name] sui turni e sulle
+  /// richieste del membro (campo `employeeName`): l'anagrafica sparisce ma lo
+  /// storico resta leggibile ("chi ha lavorato questo turno?"). Sistema anche
+  /// i documenti creati prima dell'introduzione del campo. Tutto in un unico
+  /// batch atomico.
+  ///
+  /// Limite noto (accettato per ora): l'account Auth e il documento
+  /// `users/{uid}` del dipendente non si possono toccare dal client di un
+  /// altro utente; una rimozione completa richiederebbe un backend
+  /// (Cloud Functions + Admin SDK).
+  Future<void> removeStaff(
+    String restaurantId,
+    String uid, {
+    required String name,
+  }) async {
+    final batch = _db.batch();
+
+    if (name.isNotEmpty) {
+      final shifts = await _shiftsRef(
+        restaurantId,
+      ).where('employeeUid', isEqualTo: uid).get();
+      for (final doc in shifts.docs) {
+        batch.update(doc.reference, {'employeeName': name});
+      }
+      final requests = await _leaveRef(
+        restaurantId,
+      ).where('employeeUid', isEqualTo: uid).get();
+      for (final doc in requests.docs) {
+        batch.update(doc.reference, {'employeeName': name});
+      }
+    }
+
+    batch.delete(_staffRef(restaurantId).doc(uid));
+    await batch.commit();
   }
 }

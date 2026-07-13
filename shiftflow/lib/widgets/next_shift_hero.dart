@@ -42,9 +42,10 @@ class NextShiftHero extends StatelessWidget {
         ? const [AppColors.emerald800, AppColors.emerald950]
         : const [AppColors.emerald700, AppColors.emerald900];
 
-    // "Oggi"/"Domani" se possibile, altrimenti la data compatta.
-    final when = DateFormatter.relativeDay(shift.date) ??
-        DateFormatter.dayMonthShort(shift.date);
+    // La pillola "Oggi"/"Domani" compare solo quando esiste un'etichetta
+    // relativa: la data completa c'è già nella riga sotto, ripeterla in
+    // versione compatta sarebbe un doppione.
+    final relative = DateFormatter.relativeDay(shift.date);
     final duration = DateFormatter.durationLabel(
       shift.startTime,
       shift.endTime,
@@ -88,12 +89,13 @@ class NextShiftHero extends StatelessWidget {
                           ),
                         ),
                       ),
-                      InfoPill(
-                        icon: Icons.event_rounded,
-                        label: when,
-                        background: Colors.white.withValues(alpha: 0.18),
-                        foreground: Colors.white,
-                      ),
+                      if (relative != null)
+                        InfoPill(
+                          icon: Icons.event_rounded,
+                          label: relative,
+                          background: Colors.white.withValues(alpha: 0.18),
+                          foreground: Colors.white,
+                        ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.sm),

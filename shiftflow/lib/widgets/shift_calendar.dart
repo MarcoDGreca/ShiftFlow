@@ -8,18 +8,23 @@ import '../models/leave_request.dart';
 import '../models/shift.dart';
 import 'glass_container.dart';
 
-/// Calendario mensile in stile app, condiviso tra la vista "Calendario" del
+/// Calendario in stile app, condiviso tra la vista "Calendario" del
 /// Responsabile e la vista "I miei turni" del Dipendente.
 ///
 /// Centralizza qui tutta la grafica (intestazione in italiano senza `intl`,
 /// pallini di turni e assenze, giorno selezionato/oggi): una modifica al look
 /// del calendario si fa in un punto solo.
 ///
+/// Il calendario ha due formati — **mese** e **settimana** — commutabili dal
+/// pulsante nell'intestazione. La settimana occupa una sola riga: lascia molto
+/// più spazio all'elenco del giorno, utile soprattutto al Responsabile
+/// ([startWithWeekView]).
+///
 /// I pallini in fondo a ogni giorno codificano cosa c'è quel giorno:
 ///  - **turni**: fino a 3 pallini nel colore primario;
 ///  - **ferie**/**permessi** approvati (via [leaveLoader]): un pallino nel
 ///    colore dedicato. Con [leaveLoader] valorizzato compare anche una legenda.
-class ShiftCalendar extends StatelessWidget {
+class ShiftCalendar extends StatefulWidget {
   /// Il mese mostrato dalla griglia.
   final DateTime focusedDay;
 
@@ -39,6 +44,9 @@ class ShiftCalendar extends StatelessWidget {
   /// il calendario mostra solo i turni (nessun pallino assenze, nessuna legenda).
   final List<LeaveRequest> Function(DateTime day)? leaveLoader;
 
+  /// Parte in vista settimanale (una riga sola) invece che mensile.
+  final bool startWithWeekView;
+
   /// Margine esterno della card che contiene il calendario.
   final EdgeInsetsGeometry margin;
 
@@ -50,6 +58,7 @@ class ShiftCalendar extends StatelessWidget {
     required this.eventLoader,
     this.leaveLoader,
     this.onPageChanged,
+    this.startWithWeekView = false,
     this.margin = const EdgeInsets.fromLTRB(
       AppSpacing.sm,
       AppSpacing.sm,
@@ -59,6 +68,17 @@ class ShiftCalendar extends StatelessWidget {
   });
 
   @override
+  State<ShiftCalendar> createState() => _ShiftCalendarState();
+}
+
+class _ShiftCalendarState extends State<ShiftCalendar> {
+  /// Formato corrente (mese/settimana): stato interno del widget, si cambia
+  /// dal pulsante nell'intestazione del calendario.
+  late CalendarFormat _format = widget.startWithWeekView
+      ? CalendarFormat.week
+      : CalendarFormat.month;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -66,7 +86,7 @@ class ShiftCalendar extends StatelessWidget {
     final now = DateTime.now();
 
     return GlassCard(
-      margin: margin,
+      margin: widget.margin,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xs,
         vertical: AppSpacing.xs,
@@ -79,26 +99,32 @@ class ShiftCalendar extends StatelessWidget {
           TableCalendar<Shift>(
             firstDay: now.subtract(const Duration(days: 365 * 2)),
             lastDay: now.add(const Duration(days: 365 * 2)),
-            focusedDay: focusedDay,
-            selectedDayPredicate: (day) => isSameDay(day, selectedDay),
-            onDaySelected: onDaySelected,
-            onPageChanged: onPageChanged,
+            focusedDay: widget.focusedDay,
+            selectedDayPredicate: (day) => isSameDay(day, widget.selectedDay),
+            onDaySelected: widget.onDaySelected,
+            onPageChanged: widget.onPageChanged,
             startingDayOfWeek: StartingDayOfWeek.monday,
-            // Solo vista mensile: niente pulsante per cambiare formato.
-            availableCalendarFormats: const {CalendarFormat.month: 'Mese'},
-            eventLoader: eventLoader,
+            // Due formati commutabili dal pulsante nell'intestazione: il mese
+            // per la panoramica, la settimana per lasciare spazio alla lista.
+            availableCalendarFormats: const {
+              CalendarFormat.month: 'Mese',
+              CalendarFormat.week: 'Settimana',
+            },
+            calendarFormat: _format,
+            onFormatChanged: (format) => setState(() => _format = format),
+            eventLoader: widget.eventLoader,
             calendarBuilders: CalendarBuilders<Shift>(
               // Disegniamo noi i pallini: turni (primario) + assenze (colori
               // dedicati). Chiamato per ogni giorno, anche senza turni, così le
               // assenze compaiono pure nei giorni liberi.
               markerBuilder: (context, day, shifts) {
                 final leaves =
-                    leaveLoader?.call(day) ?? const <LeaveRequest>[];
+                    widget.leaveLoader?.call(day) ?? const <LeaveRequest>[];
                 if (shifts.isEmpty && leaves.isEmpty) return null;
 
                 // Sul giorno selezionato lo sfondo è primario: un pallino
                 // primario sparirebbe, quindi lo schiariamo.
-                final isSelected = isSameDay(day, selectedDay);
+                final isSelected = isSameDay(day, widget.selectedDay);
                 final shiftColor = isSelected ? scheme.onPrimary : scheme.primary;
 
                 final dots = <Widget>[
@@ -117,8 +143,18 @@ class ShiftCalendar extends StatelessWidget {
               },
             ),
             headerStyle: HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
+              // Il pulsante mostra il formato ATTUALE (non il prossimo) e
+              // commuta mese/settimana: capsula discreta con bordo sottile.
+              formatButtonVisible: true,
+              formatButtonShowsNext: false,
+              formatButtonDecoration: BoxDecoration(
+                border: Border.all(color: scheme.outlineVariant),
+                borderRadius: const BorderRadius.all(Radius.circular(999)),
+              ),
+              formatButtonTextStyle: theme.textTheme.labelMedium!.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+              titleCentered: false,
               // Testi italiani senza package intl: usiamo i nostri formatter al
               // posto di quelli basati sul locale.
               titleTextFormatter: (date, _) => DateFormatter.monthYear(date),
@@ -161,7 +197,7 @@ class ShiftCalendar extends StatelessWidget {
               ),
             ),
           ),
-          if (leaveLoader != null)
+          if (widget.leaveLoader != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.sm,

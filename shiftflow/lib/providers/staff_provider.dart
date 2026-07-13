@@ -142,7 +142,8 @@ class StaffProvider extends ChangeNotifier {
     }
   }
 
-  /// Rimuove un dipendente dall'anagrafica del locale.
+  /// Rimuove un dipendente dall'anagrafica del locale. Il nome viene prima
+  /// "fotografato" su turni e richieste, così lo storico resta leggibile.
   Future<bool> removeDipendente(String uid) async {
     final rid = _restaurantId;
     if (rid == null) {
@@ -154,7 +155,11 @@ class StaffProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _restaurantService.removeStaff(rid, uid);
+      await _restaurantService.removeStaff(
+        rid,
+        uid,
+        name: byUid(uid)?.name ?? '',
+      );
       return true;
     } catch (_) {
       _errorMessage = 'Rimozione non riuscita. Riprova.';

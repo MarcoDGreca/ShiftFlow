@@ -11,7 +11,6 @@ import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/glass_container.dart';
-import '../../widgets/info_pill.dart';
 import '../../widgets/initials_avatar.dart';
 import '../../widgets/leave_day_card.dart';
 import '../../widgets/placeholder_view.dart';
@@ -148,6 +147,10 @@ class _CalendarioTabState extends State<CalendarioTab> {
               onPageChanged: (focused) => _focusedDay = focused,
               eventLoader: shiftProvider.shiftsOn,
               leaveLoader: leaveProvider.approvedLeavesOn,
+              // Il responsabile lavora giorno per giorno: la vista settimana
+              // (una riga) lascia lo spazio all'elenco. Il mese resta a un
+              // tocco dal pulsante nell'intestazione.
+              startWithWeekView: true,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -187,26 +190,33 @@ class _CalendarioTabState extends State<CalendarioTab> {
                         AppSizes.fabClearance + insets.bottom,
                       ),
                       children: [
+                        // Nome "vivo" dall'anagrafica se c'è; altrimenti quello
+                        // fotografato sul documento (membro rimosso dal locale).
                         for (final leave in selectedLeaves)
                           LeaveDayCard(
                             request: leave,
                             employeeName:
                                 staffProvider.byUid(leave.employeeUid)?.name ??
-                                'Dipendente',
+                                (leave.employeeName.isNotEmpty
+                                    ? leave.employeeName
+                                    : 'Dipendente'),
                           ),
                         for (final shift in selectedShifts)
                           _ShiftCard(
                             shift: shift,
                             employeeName:
                                 staffProvider.byUid(shift.employeeUid)?.name ??
-                                'Dipendente',
-                            // Turno futuro di un membro disattivato: da riassegnare.
+                                (shift.employeeName.isNotEmpty
+                                    ? shift.employeeName
+                                    : 'Dipendente'),
+                            // Turno futuro di un membro disattivato O rimosso
+                            // dal locale: in entrambi i casi va riassegnato.
                             needsReassign:
                                 selectedIsFuture &&
                                 (staffProvider
                                         .byUid(shift.employeeUid)
                                         ?.isDisattivato ??
-                                    false),
+                                    true),
                             onEdit: () => _openForm(existing: shift),
                             onDelete: () => _confirmDelete(shift),
                           ),
@@ -230,10 +240,10 @@ class _CalendarioTabState extends State<CalendarioTab> {
   }
 }
 
-/// Intestazione del giorno selezionato: la data (con "Oggi"/"Domani" quando
-/// possibile) e un riepilogo a colpo d'occhio — quanti turni, ore totali
-/// pianificate, assenze. È la domanda del responsabile: "com'è coperta
-/// questa giornata?", e la risposta sta qui senza dover contare le card.
+/// Intestazione del giorno selezionato, su UNA riga: a sinistra il giorno
+/// ("Oggi", "Domani" o la data — mai tutti e due, niente doppioni), a destra
+/// un riepilogo sobrio "3 turni · 12 h · 1 assente". Testo attenuato, zero
+/// pillole colorate: l'occhio deve andare alle card, non all'intestazione.
 class _DayHeader extends StatelessWidget {
   final DateTime day;
   final List<Shift> shifts;
@@ -248,54 +258,34 @@ class _DayHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final statusColors = theme.statusColors;
 
-    final relative = DateFormatter.relativeDay(day);
-    final title = relative != null
-        ? '$relative · ${DateFormatter.full(day)}'
-        : DateFormatter.full(day);
+    final title = DateFormatter.relativeDay(day) ?? DateFormatter.full(day);
 
     // Ore totali pianificate nel giorno (somma delle durate dei turni).
     final totalMinutes = shifts.fold<int>(
       0,
       (sum, s) => sum + DateFormatter.durationMinutes(s.startTime, s.endTime),
     );
+    final parts = <String>[
+      if (shifts.isNotEmpty)
+        shifts.length == 1 ? '1 turno' : '${shifts.length} turni',
+      if (totalMinutes > 0) DateFormatter.minutesLabel(totalMinutes),
+      if (leavesCount > 0)
+        leavesCount == 1 ? '1 assente' : '$leavesCount assenti',
+    ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(title, style: theme.textTheme.titleMedium),
-        if (shifts.isNotEmpty || leavesCount > 0) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            children: [
-              if (shifts.isNotEmpty)
-                InfoPill(
-                  icon: Icons.event_rounded,
-                  label: shifts.length == 1
-                      ? '1 turno'
-                      : '${shifts.length} turni',
-                  background: scheme.primary.withValues(alpha: 0.12),
-                  foreground: scheme.primary,
-                ),
-              if (totalMinutes > 0)
-                InfoPill(
-                  icon: Icons.timelapse_rounded,
-                  label: DateFormatter.minutesLabel(totalMinutes),
-                ),
-              if (leavesCount > 0)
-                InfoPill(
-                  icon: Icons.beach_access_rounded,
-                  label: leavesCount == 1 ? '1 assenza' : '$leavesCount assenze',
-                  background: statusColors.infoContainer,
-                  foreground: statusColors.onInfoContainer,
-                ),
-            ],
+        Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
+        if (parts.isNotEmpty)
+          Text(
+            parts.join(' · '),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ],
       ],
     );
   }

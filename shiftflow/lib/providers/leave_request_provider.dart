@@ -48,6 +48,21 @@ class LeaveRequestProvider extends ChangeNotifier {
         .toList();
   }
 
+  /// L'assenza approvata che copre il giorno per il dipendente indicato, o
+  /// `null` se quel giorno è al lavoro. È lo stato "assente" derivato: nessun
+  /// flag da scrivere e azzerare, scade da solo con la fine del periodo.
+  LeaveRequest? leaveFor(String employeeUid, DateTime day) {
+    for (final leave in approvedLeavesOn(day)) {
+      if (leave.employeeUid == employeeUid) return leave;
+    }
+    return null;
+  }
+
+  /// True se il dipendente è in ferie/permesso (approvati) nel giorno indicato:
+  /// va escluso da nuove assegnazioni e riassegnazioni per quel giorno.
+  bool isOnLeave(String employeeUid, DateTime day) =>
+      leaveFor(employeeUid, day) != null;
+
   /// Ascolta le richieste del singolo dipendente (storico personale).
   void listenForEmployee(String restaurantId, String employeeUid) {
     _listen(
@@ -101,7 +116,8 @@ class LeaveRequestProvider extends ChangeNotifier {
       _mutate((rid) => _service.createRequest(rid, request));
 
   /// Il responsabile approva o rifiuta una richiesta. In caso di approvazione
-  /// può anche agire sul turno collegato (RF6): vedi [ShiftResolution].
+  /// può anche agire sul turno collegato (RF6, vedi [ShiftResolution]) ed
+  /// eliminare i turni che cadono nel periodo dell'assenza ([removeShiftIds]).
   Future<bool> resolve(
     String requestId, {
     required bool approved,
@@ -109,6 +125,8 @@ class LeaveRequestProvider extends ChangeNotifier {
     String? relatedShiftId,
     ShiftResolution shiftResolution = ShiftResolution.keep,
     String? reassignToUid,
+    String? reassignToName,
+    List<String> removeShiftIds = const [],
   }) => _mutate(
     (rid) => _service.resolveRequest(
       rid,
@@ -118,6 +136,8 @@ class LeaveRequestProvider extends ChangeNotifier {
       relatedShiftId: relatedShiftId,
       shiftResolution: shiftResolution,
       reassignToUid: reassignToUid,
+      reassignToName: reassignToName,
+      removeShiftIds: removeShiftIds,
     ),
   );
 

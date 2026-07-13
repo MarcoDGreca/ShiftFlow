@@ -6,6 +6,7 @@ import '../../core/utils/date_formatter.dart';
 import '../../core/utils/dialogs.dart';
 import '../../models/shift.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/app_background.dart';
@@ -15,9 +16,11 @@ import '../../widgets/glass_container.dart';
 ///
 /// Se [existing] è `null` crea un nuovo turno, altrimenti modifica quello
 /// passato (campi precompilati). [initialDate] pre-compila la data di un
-/// turno nuovo (es. il giorno selezionato sul calendario). Al salvataggio
-/// chiama [ShiftProvider] e, se l'operazione riesce, torna alla lista: la
-/// card comparirà o si aggiornerà da sola grazie allo stream.
+/// turno nuovo (es. il giorno selezionato sul calendario). In creazione il
+/// turno può essere **ripetuto ogni settimana** (stesso giorno e orario) per
+/// un numero di settimane a scelta: i turni nascono in un unico batch atomico.
+/// Al salvataggio chiama [ShiftProvider] e, se l'operazione riesce, torna alla
+/// lista: le card compariranno o si aggiorneranno da sole grazie allo stream.
 class ShiftFormScreen extends StatefulWidget {
   final Shift? existing;
   final DateTime? initialDate;
@@ -36,6 +39,9 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
   DateTime? _date;
   TimeOfDay? _start;
   TimeOfDay? _end;
+
+  /// Quante settimane consecutive coprire: 1 = solo questa (non ripetere).
+  int _repeatWeeks = 1;
 
   bool get _isEditing => widget.existing != null;
 
@@ -100,6 +106,12 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     }
   }
 
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
@@ -109,11 +121,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     final startMinutes = _start!.hour * 60 + _start!.minute;
     final endMinutes = _end!.hour * 60 + _end!.minute;
     if (endMinutes == startMinutes) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("L'ora di fine non può essere uguale all'inizio."),
-        ),
-      );
+      _showSnack("L'ora di fine non può essere uguale all'inizio.");
       return;
     }
 
@@ -125,23 +133,23 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     final isNewAssignment =
         !_isEditing || _employeeUid != widget.existing!.employeeUid;
     if (isNewAssignment && (assignee?.isDisattivato ?? false)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Questo dipendente è stato disattivato: scegline un altro.',
-          ),
-        ),
-      );
+      _showSnack('Questo dipendente è stato disattivato: scegline un altro.');
       return;
     }
 
     final currentUser = context.read<AuthProvider>().currentUser;
     if (currentUser == null) return;
 
+    final leaveProvider = context.read<LeaveRequestProvider>();
+    final provider = context.read<ShiftProvider>();
+
     final notes = _notesController.text.trim();
     final shift = Shift(
       id: widget.existing?.id ?? '',
       employeeUid: _employeeUid!,
+      // Nome "fotografato" sul documento: sopravvive alla rimozione del
+      // dipendente dall'anagrafica (lo storico resta leggibile).
+      employeeName: assignee?.name ?? widget.existing?.employeeName ?? '',
       date: _date!,
       startTime: _formatTime(_start!),
       endTime: _formatTime(_end!),
@@ -151,28 +159,103 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
       createdAt: widget.existing?.createdAt,
     );
 
-    final provider = context.read<ShiftProvider>();
+    // --- Modifica di un turno esistente: percorso semplice, senza ripetizioni.
+    if (_isEditing) {
+      if (leaveProvider.isOnLeave(shift.employeeUid, shift.date)) {
+        _showSnack(
+          'Il dipendente è assente in quel giorno (ferie o permesso).',
+        );
+        return;
+      }
+      // Segnalazione sovrapposizione (§7.3): avvisa, la scelta resta al
+      // responsabile.
+      final overlap = await provider.findOverlap(shift);
+      if (!mounted) return;
+      if (overlap != null) {
+        final proceed = await _confirmOverlap(overlap);
+        if (!proceed || !mounted) return;
+      }
+      final ok = await provider.updateShift(shift);
+      if (!mounted) return;
+      if (ok) {
+        Navigator.of(context).pop();
+      } else {
+        _showSnack(provider.errorMessage ?? 'Errore. Riprova.');
+      }
+      return;
+    }
 
-    // Segnalazione sovrapposizione (§7.3): avvisa, ma la scelta è del responsabile.
-    final overlap = await provider.findOverlap(shift);
+    // --- Creazione, eventualmente ripetuta ogni settimana. ---
+    // Le occorrenze nei giorni in cui il dipendente è assente (ferie/permesso
+    // approvati) vengono saltate, non create: verranno segnalate alla fine.
+    final toCreate = <Shift>[];
+    final skipped = <DateTime>[];
+    for (var week = 0; week < _repeatWeeks; week++) {
+      final day = _date!.add(Duration(days: 7 * week));
+      if (leaveProvider.isOnLeave(shift.employeeUid, day)) {
+        skipped.add(day);
+      } else {
+        toCreate.add(shift.copyWithDate(day));
+      }
+    }
+
+    if (toCreate.isEmpty) {
+      _showSnack(
+        'Il dipendente è assente in tutte le date scelte: nessun turno creato.',
+      );
+      return;
+    }
+
+    // Sovrapposizioni (§7.3): raccogliamo le date in conflitto e avvisiamo
+    // una volta sola; la decisione resta al responsabile.
+    final overlapDays = <DateTime>[];
+    Shift? firstOverlap;
+    for (final s in toCreate) {
+      final overlap = await provider.findOverlap(s);
+      if (overlap != null) {
+        overlapDays.add(s.date);
+        firstOverlap ??= overlap;
+      }
+    }
     if (!mounted) return;
-    if (overlap != null) {
-      final proceed = await _confirmOverlap(overlap);
+    if (overlapDays.isNotEmpty) {
+      final bool proceed;
+      if (overlapDays.length == 1 && toCreate.length == 1) {
+        // Caso singolo: messaggio dettagliato di sempre.
+        proceed = await _confirmOverlap(firstOverlap!);
+      } else {
+        proceed = await showAppConfirmDialog(
+          context,
+          title: 'Turni sovrapposti',
+          message:
+              'Il dipendente ha già turni che si sovrappongono nei '
+              'giorni: ${overlapDays.map(DateFormatter.dayMonthShort).join(', ')}.'
+              '\n\nVuoi salvare comunque?',
+          confirmLabel: 'Salva comunque',
+          cancelLabel: 'No',
+        );
+      }
       if (!proceed || !mounted) return;
     }
 
-    final ok = _isEditing
-        ? await provider.updateShift(shift)
-        : await provider.createShift(shift);
+    final ok = toCreate.length == 1
+        ? await provider.createShift(toCreate.first)
+        : await provider.createShifts(toCreate);
 
     if (!mounted) return;
-    if (ok) {
-      Navigator.of(context).pop();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.errorMessage ?? 'Errore. Riprova.')),
-      );
+    if (!ok) {
+      _showSnack(provider.errorMessage ?? 'Errore. Riprova.');
+      return;
     }
+    Navigator.of(context).pop();
+    // Feedback sul risultato: quanti turni creati e quali giorni saltati.
+    final parts = <String>[
+      toCreate.length == 1 ? 'Turno creato' : '${toCreate.length} turni creati',
+      if (skipped.isNotEmpty)
+        'saltat${skipped.length == 1 ? 'o' : 'i'} '
+            '${skipped.map(DateFormatter.dayMonthShort).join(', ')} (assente)',
+    ];
+    _showSnack('${parts.join(' · ')}.');
   }
 
   /// Chiede conferma quando il nuovo turno si sovrappone a un altro dello
@@ -195,6 +278,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
   Widget build(BuildContext context) {
     final staff = context.watch<StaffProvider>().staff;
     final isSaving = context.watch<ShiftProvider>().isSaving;
+    final leaveProvider = context.watch<LeaveRequestProvider>();
 
     // Ai nuovi turni si assegnano solo dipendenti attivi; se stiamo MODIFICANDO
     // un turno di qualcuno nel frattempo disattivato, lo teniamo comunque
@@ -251,11 +335,23 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                         ),
                         items: [
                           for (final member in selectable)
+                            // Chi è assente nel giorno scelto (ferie/permesso
+                            // approvati) non è assegnabile: voce disabilitata
+                            // e annotata, così si vede il PERCHÉ.
                             DropdownMenuItem(
                               value: member.uid,
+                              enabled:
+                                  _date == null ||
+                                  !leaveProvider.isOnLeave(member.uid, _date!),
                               child: Text(
                                 member.isDisattivato
                                     ? '${member.name} (disattivato)'
+                                    : (_date != null &&
+                                          leaveProvider.isOnLeave(
+                                            member.uid,
+                                            _date!,
+                                          ))
+                                    ? '${member.name} (assente)'
                                     : member.name,
                               ),
                             ),
@@ -265,7 +361,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                             ? 'Scegli un dipendente.'
                             : null,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       // Campo data: readOnly, il valore si sceglie dal date picker.
                       // `key: ValueKey(_date)` forza la ricostruzione del campo quando
                       // la data cambia, così l'initialValue si aggiorna.
@@ -283,7 +379,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                         validator: (_) =>
                             _date == null ? 'Scegli la data.' : null,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       Row(
                         children: [
                           Expanded(
@@ -302,7 +398,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                                   _start == null ? 'Ora di inizio.' : null,
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: TextFormField(
                               key: ValueKey('end-$_end'),
@@ -321,7 +417,33 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      // Ripetizione settimanale: solo in creazione (modificare
+                      // una serie già creata è fuori portata: si modificano i
+                      // singoli turni).
+                      if (!_isEditing) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        DropdownButtonFormField<int>(
+                          initialValue: _repeatWeeks,
+                          decoration: const InputDecoration(
+                            labelText: 'Ripeti ogni settimana',
+                            prefixIcon: Icon(Icons.repeat_rounded),
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 1,
+                              child: Text('Non ripetere'),
+                            ),
+                            for (var weeks = 2; weeks <= 8; weeks++)
+                              DropdownMenuItem(
+                                value: weeks,
+                                child: Text('Per $weeks settimane'),
+                              ),
+                          ],
+                          onChanged: (weeks) =>
+                              setState(() => _repeatWeeks = weeks ?? 1),
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.md),
                       TextFormField(
                         controller: _notesController,
                         maxLines: 3,
@@ -344,7 +466,11 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
                                 ),
                               )
                             : Text(
-                                _isEditing ? 'Salva modifiche' : 'Crea turno',
+                                _isEditing
+                                    ? 'Salva modifiche'
+                                    : _repeatWeeks > 1
+                                    ? 'Crea $_repeatWeeks turni'
+                                    : 'Crea turno',
                               ),
                       ),
                     ],

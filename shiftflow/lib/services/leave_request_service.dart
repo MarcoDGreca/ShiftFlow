@@ -97,6 +97,8 @@ class LeaveRequestService {
     String? relatedShiftId,
     ShiftResolution shiftResolution = ShiftResolution.keep,
     String? reassignToUid,
+    String? reassignToName,
+    List<String> removeShiftIds = const [],
   }) async {
     final reqRef = _ref(restaurantId).doc(requestId);
 
@@ -141,10 +143,26 @@ class LeaveRequestService {
             tx.delete(shiftRef);
           case ShiftResolution.reassign:
             if (reassignToUid != null) {
-              tx.update(shiftRef, {'employeeUid': reassignToUid});
+              tx.update(shiftRef, {
+                'employeeUid': reassignToUid,
+                // Aggiorniamo anche il nome denormalizzato: deve seguire
+                // il nuovo assegnatario, non restare quello vecchio.
+                // Il `?` salta la voce se il nome è null.
+                'employeeName': ?reassignToName,
+              });
             }
           case ShiftResolution.keep:
             break; // già escluso sopra; incluso per esaustività
+        }
+      }
+
+      // Approvando ferie/permesso, i turni del dipendente che cadono nel
+      // periodo vengono eliminati QUI, nella stessa transazione: o
+      // l'approvazione e le cancellazioni riescono tutte, o nessuna
+      // (niente stati a metà se la rete cade).
+      if (approved) {
+        for (final id in removeShiftIds) {
+          tx.delete(_shiftRef(restaurantId, id));
         }
       }
     });

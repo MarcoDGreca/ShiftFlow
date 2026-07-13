@@ -254,12 +254,11 @@ class _TurniTabState extends State<TurniTab> {
     final selectedLeaves = leaveProvider.approvedLeavesOn(_selectedDay);
     final isEmpty = selectedShifts.isEmpty && selectedLeaves.isEmpty;
 
-    // "Oggi"/"Domani" prima della data: il giorno scelto si legge a colpo
-    // d'occhio senza fare i conti col calendario.
-    final relative = DateFormatter.relativeDay(_selectedDay);
-    final dayTitle = relative != null
-        ? '$relative · ${DateFormatter.full(_selectedDay)}'
-        : DateFormatter.full(_selectedDay);
+    // "Oggi"/"Domani" AL POSTO della data (mai insieme: sarebbe un doppione;
+    // la data completa è già evidenziata sul calendario qui sopra).
+    final dayTitle =
+        DateFormatter.relativeDay(_selectedDay) ??
+        DateFormatter.full(_selectedDay);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
