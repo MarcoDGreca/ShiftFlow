@@ -64,6 +64,22 @@ class Shift {
         : FieldValue.serverTimestamp(),
   };
 
+  /// True se il turno deve ancora iniziare rispetto a [moment]: combina il
+  /// giorno [date] con l'orario [startTime] ("HH:mm").
+  ///
+  /// Serve alla rimozione di un membro: i turni non ancora iniziati vengono
+  /// eliminati, quelli già svolti o in corso restano nello storico. Un orario
+  /// non interpretabile conta come "già iniziato": nel dubbio si conserva.
+  bool startsAfter(DateTime moment) {
+    final parts = startTime.split(':');
+    if (parts.length != 2) return false;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return false;
+    final start = DateTime(date.year, date.month, date.day, hour, minute);
+    return start.isAfter(moment);
+  }
+
   /// Copia del turno con data diversa: serve alla ripetizione settimanale
   /// (stesso turno spostato di 7, 14, … giorni).
   Shift copyWithDate(DateTime newDate) => Shift(

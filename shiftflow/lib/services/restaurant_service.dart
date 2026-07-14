@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/constants/app_constants.dart';
 import '../models/app_user.dart';
 import '../models/restaurant.dart';
+import '../models/shift.dart';
 
 /// Wrapper Firestore per il locale (`restaurants/{rid}`) e la sua anagrafica
 /// personale (subcollection `staff`).
@@ -103,11 +104,16 @@ class RestaurantService {
 
   /// Rimuove un membro dall'anagrafica del locale (RF7/UC5, flusso alternativo).
   ///
-  /// Prima di cancellare `staff/{uid}` scrive il [name] sui turni e sulle
-  /// richieste del membro (campo `employeeName`): l'anagrafica sparisce ma lo
-  /// storico resta leggibile ("chi ha lavorato questo turno?"). Sistema anche
-  /// i documenti creati prima dell'introduzione del campo. Tutto in un unico
-  /// batch atomico.
+  /// Oltre a cancellare `staff/{uid}`, sistema i dati che il membro si lascia
+  /// dietro — tutto in un unico batch atomico:
+  ///  - i turni NON ancora iniziati vengono eliminati: chi è stato rimosso
+  ///    non si presenterà, e lasciarli mostrerebbe ai colleghi un "in
+  ///    servizio" fantasma e al responsabile un buco che sembra coperto;
+  ///  - i turni già svolti o in corso restano nello storico, col [name]
+  ///    "fotografato" (campo `employeeName`): l'anagrafica sparisce ma
+  ///    "chi ha lavorato questo turno?" resta leggibile;
+  ///  - le richieste ancora "in attesa" vengono chiuse come "decadute",
+  ///    come nella disattivazione (UC5-E2); sulle altre si fotografa il nome.
   ///
   /// Limite noto (accettato per ora): l'account Auth e il documento
   /// `users/{uid}` del dipendente non si possono toccare dal client di un
@@ -118,21 +124,32 @@ class RestaurantService {
     String uid, {
     required String name,
   }) async {
+    final now = DateTime.now();
     final batch = _db.batch();
 
-    if (name.isNotEmpty) {
-      final shifts = await _shiftsRef(
-        restaurantId,
-      ).where('employeeUid', isEqualTo: uid).get();
-      for (final doc in shifts.docs) {
+    final shifts = await _shiftsRef(
+      restaurantId,
+    ).where('employeeUid', isEqualTo: uid).get();
+    for (final doc in shifts.docs) {
+      if (Shift.fromFirestore(doc).startsAfter(now)) {
+        batch.delete(doc.reference);
+      } else if (name.isNotEmpty) {
         batch.update(doc.reference, {'employeeName': name});
       }
-      final requests = await _leaveRef(
-        restaurantId,
-      ).where('employeeUid', isEqualTo: uid).get();
-      for (final doc in requests.docs) {
-        batch.update(doc.reference, {'employeeName': name});
-      }
+    }
+
+    final requests = await _leaveRef(
+      restaurantId,
+    ).where('employeeUid', isEqualTo: uid).get();
+    for (final doc in requests.docs) {
+      final updates = <String, dynamic>{
+        if (name.isNotEmpty) 'employeeName': name,
+        if (doc.data()['status'] == LeaveStatus.inAttesa) ...{
+          'status': LeaveStatus.decaduta,
+          'resolvedAt': FieldValue.serverTimestamp(),
+        },
+      };
+      if (updates.isNotEmpty) batch.update(doc.reference, updates);
     }
 
     batch.delete(_staffRef(restaurantId).doc(uid));

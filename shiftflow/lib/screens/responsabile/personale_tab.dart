@@ -52,7 +52,8 @@ class _PersonaleTabState extends State<PersonaleTab> {
       title: 'Rimuovere ${member.name}?',
       message:
           'Il dipendente non farà più parte del locale. '
-          'I suoi turni passati resteranno nello storico.',
+          'I suoi turni futuri verranno eliminati e le richieste in attesa '
+          'decadranno; i turni passati resteranno nello storico.',
       confirmLabel: 'Rimuovi',
       destructive: true,
     );
