@@ -5,11 +5,23 @@ service cloud.firestore {
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
+    // "Dichiara di appartenere" al locale: lo dice il suo profilo users.
+    // Da sola NON basta per accedere ai dati: la rimozione dall'anagrafica
+    // non può toccare users/{uid} (serverebbe un backend), quindi...
     function isMember(restaurantId) {
       return isSignedIn() && userDoc().restaurantId == restaurantId;
     }
+    // ...l'appartenenza EFFETTIVA richiede anche il documento staff: è quello
+    // che il responsabile elimina quando rimuove un membro. Senza, niente
+    // accesso ai dati del locale (turni, richieste, anagrafica).
+    function hasStaffDoc(restaurantId) {
+      return exists(/databases/$(database)/documents/restaurants/$(restaurantId)/staff/$(request.auth.uid));
+    }
+    function isStaff(restaurantId) {
+      return isMember(restaurantId) && hasStaffDoc(restaurantId);
+    }
     function isResponsabile(restaurantId) {
-      return isMember(restaurantId) && userDoc().role == "responsabile";
+      return isStaff(restaurantId) && userDoc().role == "responsabile";
     }
 
     match /users/{uid} {
@@ -26,15 +38,31 @@ service cloud.firestore {
     }
 
     match /restaurants/{restaurantId} {
-      allow read: if isMember(restaurantId);
-      allow write: if isResponsabile(restaurantId);
+      allow read: if isStaff(restaurantId);
+      // Creazione SOLO in fase di registrazione: l'utente è nuovo (non ha
+      // ancora un profilo users) e intesta il locale a se stesso. La
+      // registrazione scrive nell'ordine locale → staff → users, così l'app
+      // entra nella home solo quando tutto esiste già.
+      allow create: if isSignedIn()
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && !exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      allow update, delete: if isResponsabile(restaurantId);
 
       match /staff/{uid} {
-        allow read: if isMember(restaurantId);
-        allow write: if isResponsabile(restaurantId);
+        // Ognuno può leggere il PROPRIO documento staff anche se assente: il
+        // gate dell'app lo osserva per capire se il membro è stato rimosso.
+        // Per leggere quelli degli altri serve l'appartenenza effettiva.
+        allow read: if isStaff(restaurantId)
+                     || (isMember(restaurantId) && request.auth.uid == uid);
+        // Il responsabile gestisce l'anagrafica; il proprietario appena
+        // registrato (ancora senza profilo users) crea il proprio ingresso.
+        allow create: if isResponsabile(restaurantId)
+                       || (request.auth.uid == uid
+                           && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerUid == request.auth.uid);
+        allow update, delete: if isResponsabile(restaurantId);
       }
       match /shifts/{shiftId} {
-        allow read: if isMember(restaurantId);
+        allow read: if isStaff(restaurantId);
         allow create, update, delete: if isResponsabile(restaurantId);
       }
       match /leaveRequests/{requestId} {
@@ -42,14 +70,14 @@ service cloud.firestore {
         // le PROPRIE. Così nessun dipendente accede alle motivazioni (reason)
         // delle richieste altrui (RNF8, seconda clausola).
         allow read: if isResponsabile(restaurantId)
-                     || (isMember(restaurantId)
+                     || (isStaff(restaurantId)
                          && resource.data.employeeUid == request.auth.uid);
-        allow create: if isMember(restaurantId)
+        allow create: if isStaff(restaurantId)
                        && request.resource.data.employeeUid == request.auth.uid;
         // Il responsabile decide (approva/rifiuta). Il dipendente può SOLO
         // annullare la PROPRIA richiesta, e solo finché è ancora "in attesa".
         allow update: if isResponsabile(restaurantId)
-                       || (isMember(restaurantId)
+                       || (isStaff(restaurantId)
                            && resource.data.employeeUid == request.auth.uid
                            && resource.data.status == "in_attesa"
                            && request.resource.data.status == "annullata");

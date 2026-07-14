@@ -62,12 +62,25 @@ beforeEach(async () => {
       { restaurantId: 'restA', role: 'dipendente', name: 'Emp A2' });
     await setDoc(doc(db, 'users/empB'),
       { restaurantId: 'restB', role: 'dipendente', name: 'Emp B' });
+    // empRimosso: profilo users ancora presente, ma NESSUN documento staff
+    // (è lo stato in cui resta un membro dopo la rimozione dall'anagrafica).
+    await setDoc(doc(db, 'users/empRimosso'),
+      { restaurantId: 'restA', role: 'dipendente', name: 'Emp Rimosso' });
 
     await setDoc(doc(db, 'restaurants/restA'), { name: 'Ristorante A', ownerUid: 'managerA' });
     await setDoc(doc(db, 'restaurants/restB'), { name: 'Ristorante B', ownerUid: 'managerB' });
 
+    // Nell'app reale OGNI membro (responsabile compreso) ha il proprio
+    // documento staff: il seed deve rispecchiarlo, perché l'appartenenza
+    // effettiva al locale si verifica proprio sull'esistenza di questo doc.
+    await setDoc(doc(db, 'restaurants/restA/staff/managerA'),
+      { name: 'Manager A', role: 'responsabile', status: 'attivo' });
+    await setDoc(doc(db, 'restaurants/restA/staff/empA'),
+      { name: 'Emp A', role: 'dipendente', status: 'attivo' });
     await setDoc(doc(db, 'restaurants/restA/staff/empA2'),
       { name: 'Emp A2', role: 'dipendente', status: 'attivo' });
+    await setDoc(doc(db, 'restaurants/restB/staff/empB'),
+      { name: 'Emp B', role: 'dipendente', status: 'attivo' });
     await setDoc(doc(db, 'restaurants/restA/shifts/shift1'),
       { employeeUid: 'empA', date: new Date() });
     await setDoc(doc(db, 'restaurants/restA/leaveRequests/req1'),
@@ -194,6 +207,67 @@ describe('Richieste: creazione e decisione', () => {
       updateDoc(doc(as('managerA'), 'restaurants/restA/leaveRequests/req1'),
         { status: 'approvata', resolvedBy: 'managerA' }),
     );
+  });
+});
+
+// Un membro RIMOSSO conserva account Auth e profilo users (il client del
+// responsabile non può cancellarli), ma senza documento staff non deve più
+// accedere ai dati del locale. Il suo documento staff (assente) resta
+// leggibile da lui: serve al gate dell'app per capire che è stato rimosso.
+describe('Membro rimosso: niente accesso ai dati del locale', () => {
+  it('NON legge i turni del locale', async () => {
+    await assertFails(getDoc(doc(as('empRimosso'), 'restaurants/restA/shifts/shift1')));
+  });
+
+  it('NON legge il documento del locale', async () => {
+    await assertFails(getDoc(doc(as('empRimosso'), 'restaurants/restA')));
+  });
+
+  it('NON può creare richieste', async () => {
+    await assertFails(
+      setDoc(doc(as('empRimosso'), 'restaurants/restA/leaveRequests/reqR'),
+        { employeeUid: 'empRimosso', status: 'in_attesa', type: 'permesso' }),
+    );
+  });
+
+  it('NON può elencare le proprie richieste', async () => {
+    const col = collection(as('empRimosso'), 'restaurants/restA/leaveRequests');
+    await assertFails(getDocs(query(col, where('employeeUid', '==', 'empRimosso'))));
+  });
+
+  it('NON legge il documento staff di un collega', async () => {
+    await assertFails(getDoc(doc(as('empRimosso'), 'restaurants/restA/staff/empA2')));
+  });
+
+  it('PUÒ leggere il PROPRIO documento staff (assente): serve al gate', async () => {
+    await assertSucceeds(getDoc(doc(as('empRimosso'), 'restaurants/restA/staff/empRimosso')));
+  });
+});
+
+// La registrazione del responsabile scrive nell'ordine locale → staff → users:
+// così l'app entra nella home solo quando tutto esiste già, e le regole
+// possono esigere il documento staff per l'accesso ai dati.
+describe('Registrazione responsabile (locale → staff → profilo)', () => {
+  it('la sequenza completa riesce per un utente nuovo', async () => {
+    const db = as('newOwner');
+    await assertSucceeds(
+      setDoc(doc(db, 'restaurants/restNew'), { name: 'Nuovo', ownerUid: 'newOwner' }));
+    await assertSucceeds(
+      setDoc(doc(db, 'restaurants/restNew/staff/newOwner'),
+        { name: 'New Owner', role: 'responsabile', status: 'attivo' }));
+    await assertSucceeds(
+      setDoc(doc(db, 'users/newOwner'),
+        { restaurantId: 'restNew', role: 'responsabile', name: 'New Owner' }));
+  });
+
+  it('un utente GIÀ registrato non può creare un altro locale', async () => {
+    await assertFails(
+      setDoc(doc(as('empA'), 'restaurants/restX'), { name: 'X', ownerUid: 'empA' }));
+  });
+
+  it('non si può creare un locale intestato a un altro utente', async () => {
+    await assertFails(
+      setDoc(doc(as('newOwner'), 'restaurants/restY'), { name: 'Y', ownerUid: 'altroUid' }));
   });
 });
 

@@ -78,8 +78,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Osserva lo stato del membro nell'anagrafica per bloccare un dipendente
-  /// disattivato (UC2-E2). Blocca solo su "disattivato" esplicito: un documento
-  /// staff assente non blocca (evita falsi positivi durante il caricamento).
+  /// disattivato (UC2-E2) o RIMOSSO. Per un dipendente il documento staff
+  /// assente (status `null`) significa rimozione dall'anagrafica: l'account
+  /// Auth esiste ancora (il client non può cancellarlo), ma l'accesso va
+  /// negato. Il responsabile è esente: non può essere rimosso da nessuno.
   void _watchStaffStatus(AppUser? user) {
     // Utente cambiato (o logout): chiudiamo l'osservazione precedente e
     // ripartiamo dallo stato "non disattivato".
@@ -93,10 +95,13 @@ class AuthProvider extends ChangeNotifier {
     if (_staffWatchUid == user.uid) return; // già in ascolto su questo utente
 
     _staffWatchUid = user.uid;
+    final isResponsabile = user.isResponsabile;
     _staffSub = _authService
         .watchStaffStatus(user.restaurantId, user.uid)
         .listen((status) {
-          final deactivated = status == StaffStatus.disattivato;
+          final deactivated =
+              status == StaffStatus.disattivato ||
+              (status == null && !isResponsabile);
           if (deactivated != _isDeactivated) {
             _isDeactivated = deactivated;
             notifyListeners();
