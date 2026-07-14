@@ -52,7 +52,7 @@ class LeaveRequestService {
     return list;
   }
 
-  /// Richieste inviate da un singolo dipendente (storico personale, RF9).
+  /// Richieste inviate da un singolo dipendente (storico personale, RF8).
   Stream<List<LeaveRequest>> watchRequestsForEmployee(
     String restaurantId,
     String employeeUid,

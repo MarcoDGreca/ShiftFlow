@@ -40,7 +40,7 @@ service cloud.firestore {
       match /leaveRequests/{requestId} {
         // Il responsabile vede tutte le richieste del locale; il dipendente solo
         // le PROPRIE. Così nessun dipendente accede alle motivazioni (reason)
-        // delle richieste altrui (RNF2, seconda clausola).
+        // delle richieste altrui (RNF8, seconda clausola).
         allow read: if isResponsabile(restaurantId)
                      || (isMember(restaurantId)
                          && resource.data.employeeUid == request.auth.uid);

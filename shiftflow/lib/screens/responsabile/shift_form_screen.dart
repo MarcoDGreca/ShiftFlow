@@ -10,8 +10,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
-import '../../widgets/app_background.dart';
-import '../../widgets/glass_container.dart';
+import '../../widgets/glass_form_scaffold.dart';
+import '../../widgets/loading_filled_button.dart';
 import '../../widgets/section_header.dart';
 
 /// Form di creazione/modifica di un turno.
@@ -306,9 +306,7 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
         : _sortedDays;
     if (days.isEmpty) return ('', true);
     final leaveProvider = context.read<LeaveRequestProvider>();
-    final absent = days
-        .where((d) => leaveProvider.isOnLeave(uid, d))
-        .length;
+    final absent = days.where((d) => leaveProvider.isOnLeave(uid, d)).length;
     if (absent == 0) return ('', true);
     if (absent == days.length) {
       return (
@@ -341,223 +339,169 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
         ? _employeeUid
         : null;
 
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
-    // tiene il pulsante sopra la barra gesti su schermi piccoli.
-    final viewPadding = MediaQuery.paddingOf(context);
-
     final count = _selectedDays.length;
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Modifica turno' : 'Nuovo turno'),
-        flexibleSpace: const GlassBarBackground(),
-      ),
-      body: AppBackground(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              viewPadding.top + AppSpacing.lg,
-              AppSpacing.lg,
-              viewPadding.bottom + AppSpacing.lg,
+    return GlassFormScaffold(
+      title: _isEditing ? 'Modifica turno' : 'Nuovo turno',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SectionHeader(
+              title: 'Turno',
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
             ),
-            child: ConstrainedBox(
-              // Su schermi larghi (tablet) il form non si allarga a nastro.
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: GlassContainer(
-                blur: true,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(AppRadius.xl),
-                ),
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SectionHeader(
-                        title: 'Turno',
-                        padding: EdgeInsets.only(bottom: AppSpacing.sm),
-                      ),
-                      DropdownButtonFormField<String>(
-                        initialValue: employeeValue,
-                        // Senza isExpanded un nome lungo + annotazione
-                        // "(assente...)" sborda dal campo.
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Dipendente',
-                          prefixIcon: Icon(Icons.person_outline),
-                        ),
-                        items: [
-                          for (final member in selectable)
-                            // Voce annotata (ed eventualmente disabilitata)
-                            // se il membro è assente nei giorni scelti:
-                            // si vede subito il PERCHÉ non è assegnabile.
-                            _memberItem(member.uid, member.name,
-                                disattivato: member.isDisattivato),
-                        ],
-                        onChanged: (uid) => setState(() => _employeeUid = uid),
-                        validator: (_) => _employeeUid == null
-                            ? 'Scegli un dipendente.'
-                            : null,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
-                        // Allineati in alto: se solo uno dei due campi mostra
-                        // l'errore di validazione, l'altro non scivola giù.
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              key: ValueKey('start-$_start'),
-                              readOnly: true,
-                              onTap: () => _pickTime(isStart: true),
-                              initialValue: _start == null
-                                  ? ''
-                                  : _formatTime(_start!),
-                              decoration: const InputDecoration(
-                                labelText: 'Inizio',
-                                prefixIcon: Icon(Icons.schedule_rounded),
-                              ),
-                              validator: (_) =>
-                                  _start == null ? 'Ora di inizio.' : null,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: TextFormField(
-                              key: ValueKey('end-$_end'),
-                              readOnly: true,
-                              onTap: () => _pickTime(isStart: false),
-                              initialValue: _end == null
-                                  ? ''
-                                  : _formatTime(_end!),
-                              decoration: const InputDecoration(
-                                labelText: 'Fine',
-                                prefixIcon: Icon(Icons.schedule_rounded),
-                              ),
-                              validator: (_) =>
-                                  _end == null ? 'Ora di fine.' : null,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // --- Giorni ---
-                      if (_isEditing) ...[
-                        // In modifica il turno è uno solo: campo data classico.
-                        const SizedBox(height: AppSpacing.md),
-                        TextFormField(
-                          key: ValueKey(_date),
-                          readOnly: true,
-                          onTap: _pickDate,
-                          initialValue: _date == null
-                              ? ''
-                              : DateFormatter.full(_date!),
-                          decoration: const InputDecoration(
-                            labelText: 'Data',
-                            prefixIcon: Icon(Icons.calendar_today_rounded),
-                          ),
-                          validator: (_) =>
-                              _date == null ? 'Scegli la data.' : null,
-                        ),
-                      ] else ...[
-                        SectionHeader(
-                          title: 'Giorni',
-                          trailing: count == 0
-                              ? null
-                              : count == 1
-                              ? '1 giorno'
-                              : '$count giorni',
-                          padding: const EdgeInsets.fromLTRB(
-                            0,
-                            AppSpacing.lg,
-                            0,
-                            AppSpacing.sm,
-                          ),
-                        ),
-                        // Mini-calendario multi-selezione: si toccano
-                        // direttamente i giorni in cui il turno vale, anche
-                        // sparsi e su mesi diversi. Ritoccare = deselezionare.
-                        _MultiDayCalendar(
-                          focusedDay: _focusedDay,
-                          selectedDays: _selectedDays,
-                          onDayToggled: _toggleDay,
-                          onPageChanged: (focused) => _focusedDay = focused,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        if (count == 0)
-                          Text(
-                            'Tocca i giorni in cui vale il turno.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          )
-                        else
-                          // Riepilogo rimovibile: ogni chip è un giorno; la X
-                          // lo toglie senza dover tornare al mese giusto.
-                          Wrap(
-                            spacing: AppSpacing.sm,
-                            runSpacing: AppSpacing.xs,
-                            children: [
-                              for (final day in _sortedDays)
-                                InputChip(
-                                  label: Text(
-                                    DateFormatter.dayMonthShort(day),
-                                  ),
-                                  visualDensity: VisualDensity.compact,
-                                  onDeleted: () => _toggleDay(day),
-                                ),
-                            ],
-                          ),
-                      ],
-
-                      const SectionHeader(
-                        title: 'Note',
-                        padding: EdgeInsets.fromLTRB(
-                          0,
-                          AppSpacing.lg,
-                          0,
-                          AppSpacing.sm,
-                        ),
-                      ),
-                      TextFormField(
-                        controller: _notesController,
-                        maxLines: 3,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          labelText: 'Note (facoltative)',
-                          alignLabelWithHint: true,
-                          prefixIcon: Icon(Icons.notes_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      FilledButton(
-                        onPressed: isSaving ? null : _submit,
-                        child: isSaving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                _isEditing
-                                    ? 'Salva modifiche'
-                                    : count > 1
-                                    ? 'Crea $count turni'
-                                    : 'Crea turno',
-                              ),
-                      ),
-                    ],
+            DropdownButtonFormField<String>(
+              initialValue: employeeValue,
+              // Senza isExpanded un nome lungo + annotazione
+              // "(assente...)" sborda dal campo.
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Dipendente',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              items: [
+                for (final member in selectable)
+                  // Voce annotata (ed eventualmente disabilitata)
+                  // se il membro è assente nei giorni scelti:
+                  // si vede subito il PERCHÉ non è assegnabile.
+                  _memberItem(
+                    member.uid,
+                    member.name,
+                    disattivato: member.isDisattivato,
+                  ),
+              ],
+              onChanged: (uid) => setState(() => _employeeUid = uid),
+              validator: (_) =>
+                  _employeeUid == null ? 'Scegli un dipendente.' : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              // Allineati in alto: se solo uno dei due campi mostra
+              // l'errore di validazione, l'altro non scivola giù.
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('start-$_start'),
+                    readOnly: true,
+                    onTap: () => _pickTime(isStart: true),
+                    initialValue: _start == null ? '' : _formatTime(_start!),
+                    decoration: const InputDecoration(
+                      labelText: 'Inizio',
+                      prefixIcon: Icon(Icons.schedule_rounded),
+                    ),
+                    validator: (_) => _start == null ? 'Ora di inizio.' : null,
                   ),
                 ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('end-$_end'),
+                    readOnly: true,
+                    onTap: () => _pickTime(isStart: false),
+                    initialValue: _end == null ? '' : _formatTime(_end!),
+                    decoration: const InputDecoration(
+                      labelText: 'Fine',
+                      prefixIcon: Icon(Icons.schedule_rounded),
+                    ),
+                    validator: (_) => _end == null ? 'Ora di fine.' : null,
+                  ),
+                ),
+              ],
+            ),
+
+            // --- Giorni ---
+            if (_isEditing) ...[
+              // In modifica il turno è uno solo: campo data classico.
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                key: ValueKey(_date),
+                readOnly: true,
+                onTap: _pickDate,
+                initialValue: _date == null ? '' : DateFormatter.full(_date!),
+                decoration: const InputDecoration(
+                  labelText: 'Data',
+                  prefixIcon: Icon(Icons.calendar_today_rounded),
+                ),
+                validator: (_) => _date == null ? 'Scegli la data.' : null,
+              ),
+            ] else ...[
+              SectionHeader(
+                title: 'Giorni',
+                trailing: count == 0
+                    ? null
+                    : count == 1
+                    ? '1 giorno'
+                    : '$count giorni',
+                padding: const EdgeInsets.fromLTRB(
+                  0,
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.sm,
+                ),
+              ),
+              // Mini-calendario multi-selezione: si toccano
+              // direttamente i giorni in cui il turno vale, anche
+              // sparsi e su mesi diversi. Ritoccare = deselezionare.
+              _MultiDayCalendar(
+                focusedDay: _focusedDay,
+                selectedDays: _selectedDays,
+                onDayToggled: _toggleDay,
+                onPageChanged: (focused) => _focusedDay = focused,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (count == 0)
+                Text(
+                  'Tocca i giorni in cui vale il turno.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              else
+                // Riepilogo rimovibile: ogni chip è un giorno; la X
+                // lo toglie senza dover tornare al mese giusto.
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    for (final day in _sortedDays)
+                      InputChip(
+                        label: Text(DateFormatter.dayMonthShort(day)),
+                        visualDensity: VisualDensity.compact,
+                        onDeleted: () => _toggleDay(day),
+                      ),
+                  ],
+                ),
+            ],
+
+            const SectionHeader(
+              title: 'Note',
+              padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, AppSpacing.sm),
+            ),
+            TextFormField(
+              controller: _notesController,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Note (facoltative)',
+                alignLabelWithHint: true,
+                prefixIcon: Icon(Icons.notes_rounded),
               ),
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            LoadingFilledButton(
+              isLoading: isSaving,
+              onPressed: _submit,
+              label: _isEditing
+                  ? 'Salva modifiche'
+                  : count > 1
+                  ? 'Crea $count turni'
+                  : 'Crea turno',
+            ),
+          ],
         ),
       ),
     );

@@ -8,6 +8,7 @@ import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/loading_filled_button.dart';
 import 'register_screen.dart';
 
 /// Schermata di login (email + password).
@@ -80,12 +81,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     // testo con la sfumatura al posto del colore pieno).
                     ShaderMask(
                       shaderCallback: (bounds) => LinearGradient(
-                        colors:
-                            theme.brightness == Brightness.dark
-                            ? const [
-                                AppColors.emerald300,
-                                AppColors.emerald600,
-                              ]
+                        colors: theme.brightness == Brightness.dark
+                            ? const [AppColors.emerald300, AppColors.emerald600]
                             : const [
                                 AppColors.emerald600,
                                 AppColors.emerald900,
@@ -178,18 +175,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: AppSpacing.md),
                             ],
-                            FilledButton(
-                              // Bottone disabilitato mentre il login è in corso.
-                              onPressed: auth.isSubmitting ? null : _submit,
-                              child: auth.isSubmitting
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Accedi'),
+                            // Bottone disabilitato mentre il login è in corso.
+                            LoadingFilledButton(
+                              isLoading: auth.isSubmitting,
+                              onPressed: _submit,
+                              label: 'Accedi',
                             ),
                           ],
                         ),

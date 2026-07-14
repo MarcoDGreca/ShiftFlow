@@ -4,7 +4,7 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_status_colors.dart';
 import '../core/utils/date_formatter.dart';
 
-/// Striscia informativa sullo stato di sincronizzazione dei dati (RNF4 / §7.1).
+/// Striscia informativa sullo stato di sincronizzazione dei dati (RNF2 / §7.1).
 ///
 /// Non è un errore: comunica solo che si sta lavorando offline o che ci sono
 /// modifiche in coda. Se tutto è sincronizzato non occupa spazio.

@@ -31,7 +31,7 @@ class NotificationService {
 
   /// Registra l'handler dei messaggi in background. Va chiamato in `main`,
   /// prima di `runApp`. Sta qui (nel Service) così l'import di
-  /// `firebase_messaging` non risale sopra il livello Services (RNF6).
+  /// `firebase_messaging` non risale sopra il livello Services (RNF4).
   static void registerBackgroundHandler() {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }

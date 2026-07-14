@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/app_background.dart';
-import '../../widgets/glass_container.dart';
+import '../../widgets/glass_form_scaffold.dart';
+import '../../widgets/loading_filled_button.dart';
 import '../../widgets/section_header.dart';
 
 /// Schermata di registrazione del Responsabile (titolare).
@@ -64,201 +64,146 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final theme = Theme.of(context);
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra: `top` è
-    // lo spazio da lasciarle (status bar inclusa), `bottom` tiene il pulsante
-    // sopra la barra gesti quando il form è lungo e scrollato.
-    final viewPadding = MediaQuery.paddingOf(context);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text('Crea un locale'),
-        flexibleSpace: const GlassBarBackground(),
-      ),
-      body: AppBackground(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              viewPadding.top + AppSpacing.lg,
-              AppSpacing.lg,
-              viewPadding.bottom + AppSpacing.lg,
+    return GlassFormScaffold(
+      title: 'Crea un locale',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Registrazione responsabile',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleLarge,
             ),
-            child: ConstrainedBox(
-              // Su schermi larghi (tablet) il form non si allarga a nastro.
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: GlassContainer(
-                blur: true,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(AppRadius.xl),
-                ),
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Registrazione responsabile',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Crea il tuo locale e inizia a organizzare i turni.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      // Un form lungo si compila meglio a blocchi tematici:
-                      // chi sei, il tuo locale, le credenziali (chunking).
-                      const SectionHeader(
-                        title: 'I tuoi dati',
-                        padding: EdgeInsets.fromLTRB(
-                          0,
-                          AppSpacing.lg,
-                          0,
-                          AppSpacing.sm,
-                        ),
-                      ),
-                      TextFormField(
-                        controller: _nameController,
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Nome e cognome',
-                          prefixIcon: Icon(Icons.person_outline),
-                        ),
-                        validator: (v) =>
-                            Validators.notEmpty(v, field: 'Il nome'),
-                      ),
-                      const SectionHeader(
-                        title: 'Il locale',
-                        padding: EdgeInsets.fromLTRB(
-                          0,
-                          AppSpacing.lg,
-                          0,
-                          AppSpacing.sm,
-                        ),
-                      ),
-                      TextFormField(
-                        controller: _restaurantNameController,
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Nome del locale',
-                          prefixIcon: Icon(Icons.storefront_outlined),
-                        ),
-                        validator: (v) =>
-                            Validators.notEmpty(v, field: 'Il nome del locale'),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        controller: _addressController,
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Indirizzo del locale',
-                          prefixIcon: Icon(Icons.place_outlined),
-                        ),
-                        validator: (v) =>
-                            Validators.notEmpty(v, field: "L'indirizzo"),
-                      ),
-                      const SectionHeader(
-                        title: 'Accesso',
-                        padding: EdgeInsets.fromLTRB(
-                          0,
-                          AppSpacing.lg,
-                          0,
-                          AppSpacing.sm,
-                        ),
-                      ),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        validator: Validators.email,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: !_showPassword,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            tooltip: _showPassword
-                                ? 'Nascondi password'
-                                : 'Mostra password',
-                            icon: Icon(
-                              _showPassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                            onPressed: () =>
-                                setState(() => _showPassword = !_showPassword),
-                          ),
-                        ),
-                        validator: Validators.password,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        controller: _confirmController,
-                        obscureText: !_showPassword,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _submit(),
-                        decoration: const InputDecoration(
-                          labelText: 'Conferma password',
-                          prefixIcon: Icon(Icons.lock_outline),
-                        ),
-                        validator: (v) {
-                          if ((v ?? '').isEmpty) return 'Conferma la password.';
-                          if (v != _passwordController.text) {
-                            return 'Le password non coincidono.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      if (auth.errorMessage != null) ...[
-                        // liveRegion: lo screen reader annuncia l'errore
-                        // appena compare.
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            auth.errorMessage!,
-                            style: TextStyle(color: theme.colorScheme.error),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                      ],
-                      FilledButton(
-                        onPressed: auth.isSubmitting ? null : _submit,
-                        child: auth.isSubmitting
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Crea account'),
-                      ),
-                    ],
-                  ),
-                ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Crea il tuo locale e inizia a organizzare i turni.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
+            // Un form lungo si compila meglio a blocchi tematici:
+            // chi sei, il tuo locale, le credenziali (chunking).
+            const SectionHeader(
+              title: 'I tuoi dati',
+              padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, AppSpacing.sm),
+            ),
+            TextFormField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Nome e cognome',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              validator: (v) => Validators.notEmpty(v, field: 'Il nome'),
+            ),
+            const SectionHeader(
+              title: 'Il locale',
+              padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, AppSpacing.sm),
+            ),
+            TextFormField(
+              controller: _restaurantNameController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Nome del locale',
+                prefixIcon: Icon(Icons.storefront_outlined),
+              ),
+              validator: (v) =>
+                  Validators.notEmpty(v, field: 'Il nome del locale'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _addressController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Indirizzo del locale',
+                prefixIcon: Icon(Icons.place_outlined),
+              ),
+              validator: (v) => Validators.notEmpty(v, field: "L'indirizzo"),
+            ),
+            const SectionHeader(
+              title: 'Accesso',
+              padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, AppSpacing.sm),
+            ),
+            TextFormField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: Validators.email,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _passwordController,
+              obscureText: !_showPassword,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  tooltip: _showPassword
+                      ? 'Nascondi password'
+                      : 'Mostra password',
+                  icon: Icon(
+                    _showPassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                  onPressed: () =>
+                      setState(() => _showPassword = !_showPassword),
+                ),
+              ),
+              validator: Validators.password,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _confirmController,
+              obscureText: !_showPassword,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _submit(),
+              decoration: const InputDecoration(
+                labelText: 'Conferma password',
+                prefixIcon: Icon(Icons.lock_outline),
+              ),
+              validator: (v) {
+                if ((v ?? '').isEmpty) return 'Conferma la password.';
+                if (v != _passwordController.text) {
+                  return 'Le password non coincidono.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            if (auth.errorMessage != null) ...[
+              // liveRegion: lo screen reader annuncia l'errore
+              // appena compare.
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  auth.errorMessage!,
+                  style: TextStyle(color: theme.colorScheme.error),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            LoadingFilledButton(
+              isLoading: auth.isSubmitting,
+              onPressed: _submit,
+              label: 'Crea account',
+            ),
+          ],
         ),
       ),
     );

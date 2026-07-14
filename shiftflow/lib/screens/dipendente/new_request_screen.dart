@@ -8,8 +8,8 @@ import '../../models/leave_request.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
-import '../../widgets/app_background.dart';
-import '../../widgets/glass_container.dart';
+import '../../widgets/glass_form_scaffold.dart';
+import '../../widgets/loading_filled_button.dart';
 
 /// Form con cui il Dipendente invia una richiesta. Tre tipi:
 ///  - **Permesso**: un singolo giorno, con orario facoltativo;
@@ -200,109 +200,66 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSaving = context.watch<LeaveRequestProvider>().isSaving;
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
-    // tiene il pulsante sopra la barra gesti su schermi piccoli.
-    final viewPadding = MediaQuery.paddingOf(context);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text('Nuova richiesta'),
-        flexibleSpace: const GlassBarBackground(),
-      ),
-      body: AppBackground(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              viewPadding.top + AppSpacing.lg,
-              AppSpacing.lg,
-              viewPadding.bottom + AppSpacing.lg,
+    return GlassFormScaffold(
+      title: 'Nuova richiesta',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Tre opzioni, tre pulsanti in vista: con così poche
+            // scelte un menù a tendina le nasconderebbe e basta
+            // (regola: rendere visibili le opzioni disponibili).
+            Text('Tipo di richiesta', style: theme.textTheme.labelLarge),
+            const SizedBox(height: AppSpacing.sm),
+            SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: LeaveType.permesso,
+                  label: Text('Permesso'),
+                ),
+                ButtonSegment(value: LeaveType.ferie, label: Text('Ferie')),
+                ButtonSegment(
+                  value: LeaveType.cambioTurno,
+                  label: Text('Cambio'),
+                ),
+              ],
+              selected: {_type},
+              onSelectionChanged: (selection) =>
+                  setState(() => _type = selection.first),
             ),
-            child: ConstrainedBox(
-              // Su schermi larghi (tablet) il form non si allarga a nastro.
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: GlassContainer(
-                blur: true,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(AppRadius.xl),
-                ),
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Tre opzioni, tre pulsanti in vista: con così poche
-                      // scelte un menù a tendina le nasconderebbe e basta
-                      // (regola: rendere visibili le opzioni disponibili).
-                      Text(
-                        'Tipo di richiesta',
-                        style: theme.textTheme.labelLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      SegmentedButton<String>(
-                        showSelectedIcon: false,
-                        segments: const [
-                          ButtonSegment(
-                            value: LeaveType.permesso,
-                            label: Text('Permesso'),
-                          ),
-                          ButtonSegment(
-                            value: LeaveType.ferie,
-                            label: Text('Ferie'),
-                          ),
-                          ButtonSegment(
-                            value: LeaveType.cambioTurno,
-                            label: Text('Cambio'),
-                          ),
-                        ],
-                        selected: {_type},
-                        onSelectionChanged: (selection) =>
-                            setState(() => _type = selection.first),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      // Una riga di aiuto che cambia col tipo scelto: spiega
-                      // cosa aspettarsi prima di compilare (feedback immediato).
-                      Text(
-                        _typeHint,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      ..._buildTypeFields(),
-                      const SizedBox(height: AppSpacing.lg),
-                      TextFormField(
-                        controller: _reasonController,
-                        maxLines: 3,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          labelText: 'Motivo (facoltativo)',
-                          alignLabelWithHint: true,
-                          prefixIcon: Icon(Icons.notes_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      FilledButton(
-                        onPressed: isSaving ? null : _submit,
-                        child: isSaving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Invia richiesta'),
-                      ),
-                    ],
-                  ),
-                ),
+            const SizedBox(height: AppSpacing.xs),
+            // Una riga di aiuto che cambia col tipo scelto: spiega
+            // cosa aspettarsi prima di compilare (feedback immediato).
+            Text(
+              _typeHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            ..._buildTypeFields(),
+            const SizedBox(height: AppSpacing.lg),
+            TextFormField(
+              controller: _reasonController,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Motivo (facoltativo)',
+                alignLabelWithHint: true,
+                prefixIcon: Icon(Icons.notes_rounded),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            LoadingFilledButton(
+              isLoading: isSaving,
+              onPressed: _submit,
+              label: 'Invia richiesta',
+            ),
+          ],
         ),
       ),
     );
@@ -379,10 +336,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       readOnly: true,
       onTap: onTap,
       initialValue: value == null ? '' : DateFormatter.full(value),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-      ),
+      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       validator: (_) => value == null ? 'Scegli la data.' : null,
     );
   }

@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/app_background.dart';
-import '../../widgets/glass_container.dart';
+import '../../widgets/glass_form_scaffold.dart';
+import '../../widgets/loading_filled_button.dart';
 
 /// Schermata di modifica dei dati anagrafici del profilo: telefono, mansione e
 /// data di nascita. Nome ed email restano di sola lettura (l'email è legata
@@ -93,115 +93,75 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSaving = context.watch<AuthProvider>().isSavingProfile;
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
-    // tiene il pulsante sopra la barra gesti su schermi piccoli.
-    final viewPadding = MediaQuery.paddingOf(context);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text('Modifica profilo'),
-        flexibleSpace: const GlassBarBackground(),
-      ),
-      body: AppBackground(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              viewPadding.top + AppSpacing.lg,
-              AppSpacing.lg,
-              viewPadding.bottom + AppSpacing.lg,
+    return GlassFormScaffold(
+      title: 'Modifica profilo',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                // Solo caratteri plausibili per un numero.
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ()\-]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Telefono (facoltativo)',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+              validator: _validatePhone,
             ),
-            child: ConstrainedBox(
-              // Su schermi larghi (tablet) il form non si allarga a nastro.
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: GlassContainer(
-                blur: true,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(AppRadius.xl),
+            const SizedBox(height: AppSpacing.lg),
+            TextFormField(
+              controller: _positionController,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Mansione (facoltativa)',
+                hintText: 'Es. Cameriere, Cuoco, Barista',
+                prefixIcon: Icon(Icons.work_outline_rounded),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            // Campo "finto" tap-to-pick per la data di nascita.
+            InkWell(
+              onTap: _pickBirthDate,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: InputDecorator(
+                isEmpty: false,
+                decoration: InputDecoration(
+                  labelText: 'Data di nascita (facoltativa)',
+                  prefixIcon: const Icon(Icons.cake_outlined),
+                  suffixIcon: _birthDate != null
+                      ? IconButton(
+                          tooltip: 'Rimuovi',
+                          icon: const Icon(Icons.clear_rounded),
+                          onPressed: () => setState(() => _birthDate = null),
+                        )
+                      : const Icon(Icons.calendar_month_outlined),
                 ),
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          // Solo caratteri plausibili per un numero.
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'[0-9+ ()\-]'),
-                          ),
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Telefono (facoltativo)',
-                          prefixIcon: Icon(Icons.phone_outlined),
+                child: Text(
+                  _birthDate != null
+                      ? DateFormatter.dayMonthYearFull(_birthDate!)
+                      : 'Tocca per scegliere',
+                  style: _birthDate != null
+                      ? null
+                      : theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                        validator: _validatePhone,
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      TextFormField(
-                        controller: _positionController,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          labelText: 'Mansione (facoltativa)',
-                          hintText: 'Es. Cameriere, Cuoco, Barista',
-                          prefixIcon: Icon(Icons.work_outline_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      // Campo "finto" tap-to-pick per la data di nascita.
-                      InkWell(
-                        onTap: _pickBirthDate,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        child: InputDecorator(
-                          isEmpty: false,
-                          decoration: InputDecoration(
-                            labelText: 'Data di nascita (facoltativa)',
-                            prefixIcon: const Icon(Icons.cake_outlined),
-                            suffixIcon: _birthDate != null
-                                ? IconButton(
-                                    tooltip: 'Rimuovi',
-                                    icon: const Icon(Icons.clear_rounded),
-                                    onPressed: () =>
-                                        setState(() => _birthDate = null),
-                                  )
-                                : const Icon(Icons.calendar_month_outlined),
-                          ),
-                          child: Text(
-                            _birthDate != null
-                                ? DateFormatter.dayMonthYearFull(_birthDate!)
-                                : 'Tocca per scegliere',
-                            style: _birthDate != null
-                                ? null
-                                : theme.textTheme.bodyLarge?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      FilledButton(
-                        onPressed: isSaving ? null : _submit,
-                        child: isSaving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Salva'),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            LoadingFilledButton(
+              isLoading: isSaving,
+              onPressed: _submit,
+              label: 'Salva',
+            ),
+          ],
         ),
       ),
     );

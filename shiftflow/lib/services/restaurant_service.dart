@@ -52,7 +52,7 @@ class RestaurantService {
   // AuthService.createDipendente, perché comporta la creazione di un account
   // Firebase Auth (con la tecnica dell'istanza secondaria).
 
-  /// Attiva o disattiva un membro dell'anagrafica (RF8/UC5).
+  /// Attiva o disattiva un membro dell'anagrafica (RF7/UC5).
   ///
   /// La disattivazione è "soft": il documento resta (turni e storico intatti),
   /// ma il membro viene escluso dall'assegnazione di nuovi turni. È preferibile
@@ -101,7 +101,7 @@ class RestaurantService {
           .doc(restaurantId)
           .collection(FirestoreCollections.shifts);
 
-  /// Rimuove un membro dall'anagrafica del locale.
+  /// Rimuove un membro dall'anagrafica del locale (RF7/UC5, flusso alternativo).
   ///
   /// Prima di cancellare `staff/{uid}` scrive il [name] sui turni e sulle
   /// richieste del membro (campo `employeeName`): l'anagrafica sparisce ma lo

@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/constants/app_constants.dart';
 import '../models/shift.dart';
 
-/// Turni + stato di sincronizzazione dello snapshot da cui provengono (RNF4).
+/// Turni + stato di sincronizzazione dello snapshot da cui provengono (RNF2).
 ///
 /// - [isFromCache]: i dati arrivano dalla cache locale (tipicamente offline);
 /// - [hasPendingWrites]: ci sono scritture locali non ancora confermate dal
@@ -57,7 +57,7 @@ class ShiftService {
   ///
   /// `includeMetadataChanges: true` fa riemettere lo stream anche quando cambia
   /// solo lo stato di sincronizzazione (es. una scrittura in coda che viene
-  /// confermata), così la UI può aggiornare l'indicatore offline (RNF4).
+  /// confermata), così la UI può aggiornare l'indicatore offline (RNF2).
   Stream<ShiftsView> watchShiftsForEmployee(
     String restaurantId,
     String employeeUid,

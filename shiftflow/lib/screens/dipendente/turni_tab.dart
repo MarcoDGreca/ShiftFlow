@@ -21,7 +21,7 @@ import '../../widgets/sync_status_banner.dart';
 import 'shift_detail_sheet.dart';
 
 /// Sezione "I miei turni" del Dipendente. Due modi di guardare gli stessi
-/// turni (solo i propri, RF9):
+/// turni (solo i propri, RF3):
 /// - **Lista**: il prossimo turno in evidenza (pattern "Up Next" delle app di
 ///   turni) e sotto i successivi; i passati dietro un filtro;
 /// - **Calendario**: griglia mensile con i pallini dei propri turni e, sotto,
