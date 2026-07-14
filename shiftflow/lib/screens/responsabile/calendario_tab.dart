@@ -101,18 +101,11 @@ class _CalendarioTabState extends State<CalendarioTab> {
     final selectedShifts = shiftProvider.shiftsOn(_selectedDay);
     final selectedLeaves = leaveProvider.approvedLeavesOn(_selectedDay);
 
-    // I turni futuri di un membro disattivato vanno segnalati "da riassegnare"
-    // (UC5, flusso alternativo). Tutti i turni mostrati sono del giorno scelto:
-    // basta sapere se quel giorno è da oggi in poi.
+    // I turni NON ancora iniziati di un membro disattivato vanno segnalati
+    // "da riassegnare" (UC5, flusso alternativo). Il confronto è sull'orario
+    // di inizio: un turno di oggi già iniziato o concluso è storico e non
+    // va marcato.
     final now = DateTime.now();
-    final selectedDay = DateTime(
-      _selectedDay.year,
-      _selectedDay.month,
-      _selectedDay.day,
-    );
-    final selectedIsFuture = !selectedDay.isBefore(
-      DateTime(now.year, now.month, now.day),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -209,10 +202,11 @@ class _CalendarioTabState extends State<CalendarioTab> {
                                 (shift.employeeName.isNotEmpty
                                     ? shift.employeeName
                                     : 'Dipendente'),
-                            // Turno futuro di un membro disattivato O rimosso
-                            // dal locale: in entrambi i casi va riassegnato.
+                            // Turno non ancora iniziato di un membro
+                            // disattivato O rimosso dal locale: in entrambi
+                            // i casi va riassegnato.
                             needsReassign:
-                                selectedIsFuture &&
+                                shift.startsAfter(now) &&
                                 (staffProvider
                                         .byUid(shift.employeeUid)
                                         ?.isDisattivato ??

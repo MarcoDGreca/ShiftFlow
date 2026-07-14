@@ -390,8 +390,21 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
         .map((r) => r.relatedShiftId!)
         .toSet();
 
+    // Difensivo: il turno scelto potrebbe essere stato eliminato (o essere
+    // passato) mentre il form era aperto. Un valore non più tra le voci
+    // manderebbe il dropdown in errore: lo azzeriamo e la validazione
+    // chiederà di sceglierne un altro.
+    final shiftValue = futureShifts.any((s) => s.id == _relatedShiftId)
+        ? _relatedShiftId
+        : null;
+    if (shiftValue == null) _relatedShiftId = null;
+
     return DropdownButtonFormField<String>(
-      initialValue: _relatedShiftId,
+      // La chiave segue il valore: se il turno selezionato sparisce dalle
+      // voci, il campo si ricostruisce azzerato invece di tenere in pancia
+      // un valore che non esiste più.
+      key: ValueKey('turno-$shiftValue'),
+      initialValue: shiftValue,
       isExpanded: true,
       decoration: const InputDecoration(
         labelText: 'Turno interessato',

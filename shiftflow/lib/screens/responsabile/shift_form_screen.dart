@@ -338,6 +338,11 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
     final employeeValue = selectable.any((m) => m.uid == _employeeUid)
         ? _employeeUid
         : null;
+    // Membro sparito dall'anagrafica mentre il form era aperto: azzeriamo la
+    // scelta, così la validazione chiede di sceglierne un altro invece di
+    // salvare un turno intestato a un uid rimosso. (Solo a staff caricato:
+    // una lista ancora vuota non significa "membro sparito".)
+    if (staff.isNotEmpty && employeeValue == null) _employeeUid = null;
 
     final count = _selectedDays.length;
 
@@ -354,6 +359,10 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
               padding: EdgeInsets.only(bottom: AppSpacing.sm),
             ),
             DropdownButtonFormField<String>(
+              // La chiave segue il valore: se il membro selezionato sparisce
+              // dalle voci, il campo si ricostruisce azzerato invece di
+              // tenere in pancia un valore che non esiste più (errore Flutter).
+              key: ValueKey('employee-$employeeValue'),
               initialValue: employeeValue,
               // Senza isExpanded un nome lungo + annotazione
               // "(assente...)" sborda dal campo.

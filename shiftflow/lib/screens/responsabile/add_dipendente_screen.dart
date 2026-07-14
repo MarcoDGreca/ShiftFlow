@@ -6,6 +6,7 @@ import '../../core/utils/validators.dart';
 import '../../providers/staff_provider.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/loading_filled_button.dart';
 
 /// Form di aggiunta di un dipendente: il responsabile ne crea l'account
 /// (email + password iniziale da comunicargli) e l'ingresso in anagrafica.
@@ -21,6 +22,7 @@ class _AddDipendenteScreenState extends State<AddDipendenteScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -111,14 +113,29 @@ class _AddDipendenteScreenState extends State<AddDipendenteScreen> {
                       const SizedBox(height: AppSpacing.md),
                       TextFormField(
                         controller: _passwordController,
-                        obscureText: true,
+                        obscureText: !_showPassword,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _submit(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Password iniziale',
-                          prefixIcon: Icon(Icons.lock_outline),
+                          prefixIcon: const Icon(Icons.lock_outline),
                           helperText:
                               'Comunicala al dipendente: la userà per accedere.',
+                          // Poterla vedere in chiaro aiuta: questa password
+                          // va letta e comunicata al dipendente.
+                          suffixIcon: IconButton(
+                            tooltip: _showPassword
+                                ? 'Nascondi password'
+                                : 'Mostra password',
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                            ),
+                            onPressed: () => setState(
+                              () => _showPassword = !_showPassword,
+                            ),
+                          ),
                         ),
                         validator: Validators.password,
                       ),
@@ -136,17 +153,10 @@ class _AddDipendenteScreenState extends State<AddDipendenteScreen> {
                         ),
                         const SizedBox(height: AppSpacing.md),
                       ],
-                      FilledButton(
-                        onPressed: staff.isSaving ? null : _submit,
-                        child: staff.isSaving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Crea dipendente'),
+                      LoadingFilledButton(
+                        isLoading: staff.isSaving,
+                        onPressed: _submit,
+                        label: 'Crea dipendente',
                       ),
                     ],
                   ),
