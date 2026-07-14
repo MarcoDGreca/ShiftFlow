@@ -15,11 +15,17 @@ class ShiftFlowLogo extends StatelessWidget {
   final bool monochrome;
   final Color monochromeColor;
 
+  /// Avanzamento del disegno (0..1) per la splash animata: l'onda si traccia
+  /// nella prima parte, le eco compaiono dopo. Con 1.0 (default) il logo è
+  /// quello statico di sempre.
+  final double progress;
+
   const ShiftFlowLogo({
     super.key,
     this.size = 64,
     this.monochrome = false,
     this.monochromeColor = Colors.white,
+    this.progress = 1.0,
   });
 
   @override
@@ -32,6 +38,7 @@ class ShiftFlowLogo extends StatelessWidget {
         painter: ShiftFlowLogoPainter(
           monochrome: monochrome,
           monochromeColor: monochromeColor,
+          progress: progress,
         ),
       ),
     );
@@ -42,10 +49,28 @@ class ShiftFlowLogoPainter extends CustomPainter {
   final bool monochrome;
   final Color monochromeColor;
 
+  /// Vedi [ShiftFlowLogo.progress].
+  final double progress;
+
   const ShiftFlowLogoPainter({
     this.monochrome = false,
     this.monochromeColor = Colors.white,
+    this.progress = 1.0,
   });
+
+  // Fasi della timeline, come frazioni di [progress]: prima si traccia
+  // l'onda, poi (in parte sovrapposte) compaiono le eco.
+  static const _waveEnd = 0.6;
+  static const _echoStart = 0.4;
+  static const _echoEnd = 0.75;
+
+  /// Il tratto [path] fermato alla frazione [t] della sua lunghezza:
+  /// è ciò che dà l'effetto "pennellata che si disegna".
+  Path _trim(Path path, double t) {
+    if (t >= 1.0) return path;
+    final metric = path.computeMetrics().first;
+    return metric.extractPath(0, metric.length * t);
+  }
 
   /// La curva a "S", in coordinate proporzionali (0..1) moltiplicate per il
   /// lato del canvas. [dx]/[dy] spostano l'intera curva: servono per le
@@ -90,44 +115,62 @@ class ShiftFlowLogoPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final s = size.shortestSide;
 
+    // Quanto è tracciata l'onda e quanto sono visibili le eco, derivati
+    // dall'unico progress: così il chiamante anima un solo valore.
+    final waveT = Curves.easeInOut.transform(
+      (progress / _waveEnd).clamp(0.0, 1.0),
+    );
+    final echoT =
+        ((progress - _echoStart) / (_echoEnd - _echoStart)).clamp(0.0, 1.0);
+
     if (monochrome) {
       // Silhouette pulita: solo l'onda principale, un filo più spessa.
       // Le eco dello stesso colore si fonderebbero in una macchia.
-      canvas.drawPath(
-        _wave(s, 0, 0),
-        _stroke(0.17 * s)..color = monochromeColor,
-      );
+      if (waveT > 0) {
+        canvas.drawPath(
+          _trim(_wave(s, 0, 0), waveT),
+          _stroke(0.17 * s)..color = monochromeColor,
+        );
+      }
       return;
     }
 
-    // Eco superiore: più chiara e sottile, come un riflesso.
-    canvas.drawPath(
-      _wave(s, -0.075, -0.075),
-      _stroke(0.055 * s)..color = AppColors.emerald300.withValues(alpha: 0.85),
-    );
-    // Eco inferiore: più scura, come un'ombra dell'onda.
-    canvas.drawPath(
-      _wave(s, 0.075, 0.075),
-      _stroke(0.055 * s)..color = AppColors.emerald700.withValues(alpha: 0.75),
-    );
+    if (echoT > 0) {
+      // Eco superiore: più chiara e sottile, come un riflesso.
+      canvas.drawPath(
+        _wave(s, -0.075, -0.075),
+        _stroke(0.055 * s)
+          ..color = AppColors.emerald300.withValues(alpha: 0.85 * echoT),
+      );
+      // Eco inferiore: più scura, come un'ombra dell'onda.
+      canvas.drawPath(
+        _wave(s, 0.075, 0.075),
+        _stroke(0.055 * s)
+          ..color = AppColors.emerald700.withValues(alpha: 0.75 * echoT),
+      );
+    }
+
     // Onda principale con il gradiente del brand.
-    canvas.drawPath(
-      _wave(s, 0, 0),
-      _stroke(0.15 * s)
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.emerald300,
-            AppColors.emerald600,
-            AppColors.emerald900,
-          ],
-        ).createShader(Offset.zero & size),
-    );
+    if (waveT > 0) {
+      canvas.drawPath(
+        _trim(_wave(s, 0, 0), waveT),
+        _stroke(0.15 * s)
+          ..shader = const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.emerald300,
+              AppColors.emerald600,
+              AppColors.emerald900,
+            ],
+          ).createShader(Offset.zero & size),
+      );
+    }
   }
 
   @override
   bool shouldRepaint(covariant ShiftFlowLogoPainter oldDelegate) =>
       oldDelegate.monochrome != monochrome ||
-      oldDelegate.monochromeColor != monochromeColor;
+      oldDelegate.monochromeColor != monochromeColor ||
+      oldDelegate.progress != progress;
 }
