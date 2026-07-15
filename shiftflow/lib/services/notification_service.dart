@@ -16,6 +16,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 /// Wrapper attorno a Firebase Cloud Messaging (FCM) — livello Services.
 ///
+/// Realizza la predisposizione client-side delle notifiche prevista da RNF6.
+///
 /// COSA COPRE (parte fattibile lato client, in-stack):
 ///  - chiedere il permesso di ricevere notifiche;
 ///  - ottenere e salvare il token del dispositivo in `users/{uid}.fcmTokens`;
