@@ -117,6 +117,7 @@ class _CalendarioTabState extends State<CalendarioTab> {
             isFromCache: shiftProvider.isFromCache,
             hasPendingWrites: shiftProvider.hasPendingWrites,
             lastUpdated: shiftProvider.lastSyncedAt,
+            errorMessage: shiftProvider.errorMessage,
           ),
           if (shiftProvider.isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
@@ -170,8 +171,6 @@ class _CalendarioTabState extends State<CalendarioTab> {
                         title: 'Niente in questo giorno',
                         subtitle:
                             'Nessun turno o assenza in questa data.',
-                        actionLabel: 'Crea turno',
-                        onAction: _openForm,
                       ),
                     )
                   // Prima le assenze (contesto), poi i turni del giorno.

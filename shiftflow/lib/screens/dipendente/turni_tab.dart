@@ -97,6 +97,7 @@ class _TurniTabState extends State<TurniTab> {
           isFromCache: shiftProvider.isFromCache,
           hasPendingWrites: shiftProvider.hasPendingWrites,
           lastUpdated: shiftProvider.lastSyncedAt,
+          errorMessage: shiftProvider.errorMessage,
         ),
         // Interruttore Lista / Calendario: stesso dato, due viste.
         Padding(

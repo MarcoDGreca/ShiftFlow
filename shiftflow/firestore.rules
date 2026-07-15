@@ -17,8 +17,19 @@ service cloud.firestore {
     function hasStaffDoc(restaurantId) {
       return exists(/databases/$(database)/documents/restaurants/$(restaurantId)/staff/$(request.auth.uid));
     }
+    // Il PROPRIETARIO del locale (campo ownerUid del documento ristorante) non
+    // può essere rimosso da nessuno: il suo accesso NON deve dipendere dal
+    // documento staff, altrimenti un locale senza quel doc lo chiuderebbe fuori
+    // dai propri dati (e non potrebbe nemmeno ricrearlo: chicken-and-egg).
+    // È la fonte di verità sulla proprietà, quindi lo trattiamo sempre come staff.
+    function isOwner(restaurantId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/restaurants/$(restaurantId))
+        && get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerUid == request.auth.uid;
+    }
     function isStaff(restaurantId) {
-      return isMember(restaurantId) && hasStaffDoc(restaurantId);
+      return isOwner(restaurantId)
+        || (isMember(restaurantId) && hasStaffDoc(restaurantId));
     }
     function isResponsabile(restaurantId) {
       return isStaff(restaurantId) && userDoc().role == "responsabile";

@@ -6,8 +6,11 @@ import '../core/utils/date_formatter.dart';
 
 /// Striscia informativa sullo stato di sincronizzazione dei dati (RNF2 / §7.1).
 ///
-/// Non è un errore: comunica solo che si sta lavorando offline o che ci sono
-/// modifiche in coda. Se tutto è sincronizzato non occupa spazio.
+/// Di norma non è un errore: comunica che si sta lavorando offline o che ci
+/// sono modifiche in coda. Ma se il caricamento è FALLITO ([errorMessage]) lo
+/// dice chiaramente, con priorità: un errore non deve travestirsi da "offline"
+/// (che farebbe pensare a un semplice calo di rete). Se tutto è sincronizzato
+/// e non c'è errore, non occupa spazio.
 class SyncStatusBanner extends StatelessWidget {
   final bool isFromCache;
   final bool hasPendingWrites;
@@ -16,22 +19,37 @@ class SyncStatusBanner extends StatelessWidget {
   /// quando si è offline, così l'utente sa quanto sono aggiornati (UC2-E1).
   final DateTime? lastUpdated;
 
+  /// Messaggio d'errore del caricamento (es. permessi negati). Se presente,
+  /// prevale su offline/modifiche-in-coda: i dati mostrati sotto potrebbero
+  /// essere vecchi e l'utente deve saperlo.
+  final String? errorMessage;
+
   const SyncStatusBanner({
     super.key,
     required this.isFromCache,
     required this.hasPendingWrites,
     this.lastUpdated,
+    this.errorMessage,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (!isFromCache && !hasPendingWrites) return const SizedBox.shrink();
+    if (errorMessage == null && !isFromCache && !hasPendingWrites) {
+      return const SizedBox.shrink();
+    }
 
     final statusColors = Theme.of(context).statusColors;
 
-    // Le scritture in coda sono l'informazione più importante da dare:
-    // usano il colore "attenzione"; l'offline è solo informativo.
-    final (icon, text, background, foreground) = hasPendingWrites
+    // Priorità: errore (rosso) → modifiche in coda (attenzione) → offline (info).
+    // L'errore è lo stato più importante: qualcosa non ha funzionato davvero.
+    final (icon, text, background, foreground) = errorMessage != null
+        ? (
+            Icons.error_outline_rounded,
+            errorMessage!,
+            statusColors.dangerContainer,
+            statusColors.onDangerContainer,
+          )
+        : hasPendingWrites
         ? (
             Icons.sync_problem_rounded,
             'Modifiche non ancora sincronizzate',

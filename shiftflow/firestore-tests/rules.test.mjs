@@ -70,6 +70,15 @@ beforeEach(async () => {
     await setDoc(doc(db, 'restaurants/restA'), { name: 'Ristorante A', ownerUid: 'managerA' });
     await setDoc(doc(db, 'restaurants/restB'), { name: 'Ristorante B', ownerUid: 'managerB' });
 
+    // managerC: PROPRIETARIO di restC (ownerUid) ma SENZA documento staff.
+    // È lo stato di un locale creato/seedato a mano prima che le regole
+    // esigessero il doc staff: il proprietario deve comunque accedere.
+    await setDoc(doc(db, 'users/managerC'),
+      { restaurantId: 'restC', role: 'responsabile', name: 'Manager C' });
+    await setDoc(doc(db, 'restaurants/restC'), { name: 'Ristorante C', ownerUid: 'managerC' });
+    await setDoc(doc(db, 'restaurants/restC/shifts/shiftC'),
+      { employeeUid: 'managerC', date: new Date() });
+
     // Nell'app reale OGNI membro (responsabile compreso) ha il proprio
     // documento staff: il seed deve rispecchiarlo, perché l'appartenenza
     // effettiva al locale si verifica proprio sull'esistenza di questo doc.
@@ -268,6 +277,39 @@ describe('Registrazione responsabile (locale → staff → profilo)', () => {
   it('non si può creare un locale intestato a un altro utente', async () => {
     await assertFails(
       setDoc(doc(as('newOwner'), 'restaurants/restY'), { name: 'Y', ownerUid: 'altroUid' }));
+  });
+});
+
+// Il proprietario del locale è identificato dal campo ownerUid del ristorante,
+// non dal documento staff: non può essere rimosso, quindi il suo accesso non
+// deve dipendere da quel doc (altrimenti resterebbe chiuso fuori dai suoi dati).
+describe('Proprietario senza documento staff: accede comunque', () => {
+  it('legge i turni del proprio locale', async () => {
+    await assertSucceeds(getDoc(doc(as('managerC'), 'restaurants/restC/shifts/shiftC')));
+  });
+
+  it('legge il documento del proprio locale', async () => {
+    await assertSucceeds(getDoc(doc(as('managerC'), 'restaurants/restC')));
+  });
+
+  it('può elencare i turni del proprio locale', async () => {
+    await assertSucceeds(getDocs(collection(as('managerC'), 'restaurants/restC/shifts')));
+  });
+
+  it('può creare turni nel proprio locale', async () => {
+    await assertSucceeds(
+      setDoc(doc(as('managerC'), 'restaurants/restC/shifts/shiftC2'),
+        { employeeUid: 'managerC', date: new Date() }));
+  });
+
+  it('può creare il proprio documento staff (bootstrap)', async () => {
+    await assertSucceeds(
+      setDoc(doc(as('managerC'), 'restaurants/restC/staff/managerC'),
+        { name: 'Manager C', role: 'responsabile', status: 'attivo' }));
+  });
+
+  it('un estraneo NON accede a restC', async () => {
+    await assertFails(getDoc(doc(as('empB'), 'restaurants/restC/shifts/shiftC')));
   });
 });
 

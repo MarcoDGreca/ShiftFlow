@@ -154,9 +154,6 @@ class _PersonaleTabState extends State<PersonaleTab> {
       emptySubtitle:
           'Crea gli account dei tuoi dipendenti: potranno vedere i turni '
           'e inviarti richieste.',
-      emptyActionLabel: 'Aggiungi dipendente',
-      emptyActionIcon: Icons.person_add_rounded,
-      onEmptyAction: _openAdd,
       child: ListView.builder(
         padding: EdgeInsets.fromLTRB(
           AppSpacing.sm,

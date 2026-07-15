@@ -13,12 +13,6 @@ class AsyncStateView extends StatelessWidget {
   final String emptyTitle;
   final String emptySubtitle;
 
-  /// Azione facoltativa dello stato vuoto (es. "Nuova richiesta"): un empty
-  /// state con un pulsante suggerisce subito il passo successivo.
-  final String? emptyActionLabel;
-  final IconData? emptyActionIcon;
-  final VoidCallback? onEmptyAction;
-
   final Widget child;
 
   const AsyncStateView({
@@ -29,9 +23,6 @@ class AsyncStateView extends StatelessWidget {
     required this.emptyIcon,
     required this.emptyTitle,
     required this.emptySubtitle,
-    this.emptyActionLabel,
-    this.emptyActionIcon,
-    this.onEmptyAction,
     required this.child,
   });
 
@@ -54,9 +45,6 @@ class AsyncStateView extends StatelessWidget {
         icon: emptyIcon,
         title: emptyTitle,
         subtitle: emptySubtitle,
-        actionLabel: emptyActionLabel,
-        actionIcon: emptyActionIcon,
-        onAction: onEmptyAction,
       );
     }
     return child;

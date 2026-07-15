@@ -40,11 +40,6 @@ class RequestsListView extends StatefulWidget {
   final String emptyTitle;
   final String emptySubtitle;
 
-  /// Azione facoltativa dello stato vuoto (es. aprire "Nuova richiesta").
-  final String? emptyActionLabel;
-  final IconData? emptyActionIcon;
-  final VoidCallback? onEmptyAction;
-
   /// Titolo della sezione delle richieste in attesa (es. "Da gestire" per il
   /// Responsabile, "In attesa" per il Dipendente).
   final String pendingSectionTitle;
@@ -70,9 +65,6 @@ class RequestsListView extends StatefulWidget {
     required this.emptyTitle,
     required this.emptySubtitle,
     required this.relatedShiftFor,
-    this.emptyActionLabel,
-    this.emptyActionIcon,
-    this.onEmptyAction,
     this.pendingSectionTitle = 'In attesa',
     this.employeeNameFor,
     this.actionsFor,
@@ -153,9 +145,6 @@ class _RequestsListViewState extends State<RequestsListView> {
             emptySubtitle: noRequestsAtAll
                 ? widget.emptySubtitle
                 : 'Nessuna richiesta ha lo stato "${_filter.label}".',
-            emptyActionLabel: noRequestsAtAll ? widget.emptyActionLabel : null,
-            emptyActionIcon: noRequestsAtAll ? widget.emptyActionIcon : null,
-            onEmptyAction: noRequestsAtAll ? widget.onEmptyAction : null,
             child: ListView(
               padding: EdgeInsets.fromLTRB(
                 AppSpacing.sm,

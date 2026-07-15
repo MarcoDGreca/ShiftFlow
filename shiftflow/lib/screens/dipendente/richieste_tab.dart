@@ -108,10 +108,6 @@ class _RichiesteTabState extends State<RichiesteTab> {
         emptyTitle: 'Nessuna richiesta',
         emptySubtitle:
             'Ferie, permessi o cambi turno: invia qui la tua prima richiesta.',
-        // Empty state azionabile: stessa azione del FAB, ma a portata di
-        // pollice proprio dove l'occhio sta già guardando.
-        emptyActionLabel: 'Nuova richiesta',
-        onEmptyAction: _openNewRequest,
         relatedShiftFor: (request) => request.relatedShiftId == null
             ? null
             : shiftProvider.byId(request.relatedShiftId!),
