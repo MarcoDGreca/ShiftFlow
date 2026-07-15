@@ -1,7 +1,7 @@
 # Splash animata all'avvio — Design
 
 Data: 2026-07-14
-Stato: approvato (brainstorming con Marco)
+Stato: approvato
 
 ## Obiettivo
 

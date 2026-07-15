@@ -1,14 +1,12 @@
 # Splash Animata Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Splash animata all'avvio: l'onda del logo si traccia come una pennellata, poi eco e titolo in dissolvenza (~1,5 s, sempre completa) prima di entrare in home/login.
 
 **Architecture:** Il painter esistente del logo riceve un parametro `progress` (0..1) che trima il tratto con `PathMetrics` e sfuma le eco; un nuovo widget `AnimatedSplashScreen` possiede l'`AnimationController` e chiama `onFinished` a fine corsa; `AuthGate` diventa stateful e tiene la splash finché intro e stato auth non sono entrambi pronti.
 
 **Tech Stack:** Flutter puro (CustomPaint, PathMetrics, AnimationController). NESSUN pacchetto nuovo.
 
-**Spec:** `docs/superpowers/specs/2026-07-14-animated-splash-design.md`
+**Spec:** `docs/specs/2026-07-14-animated-splash-design.md`
 
 ## Global Constraints
 
