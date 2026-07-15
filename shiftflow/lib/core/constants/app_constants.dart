@@ -28,7 +28,6 @@ class UserRoles {
 class StaffStatus {
   StaffStatus._();
 
-  static const String invitato = 'invitato';
   static const String attivo = 'attivo';
   static const String disattivato = 'disattivato'; // non riceve nuovi turni
 }
