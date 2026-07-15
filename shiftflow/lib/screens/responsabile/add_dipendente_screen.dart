@@ -120,7 +120,7 @@ class _AddDipendenteScreenState extends State<AddDipendenteScreen> {
                           labelText: 'Password iniziale',
                           prefixIcon: const Icon(Icons.lock_outline),
                           helperText:
-                              'Comunicala al dipendente: la userà per accedere.',
+                              'Comunicala al dipendente.',
                           // Poterla vedere in chiaro aiuta: questa password
                           // va letta e comunicata al dipendente.
                           suffixIcon: IconButton(
