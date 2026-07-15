@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/leave_request_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/staff_provider.dart';
+import '../../widgets/bottom_fade.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/initials_avatar.dart';
 import '../../widgets/leave_day_card.dart';
@@ -130,93 +131,120 @@ class _CalendarioTabState extends State<CalendarioTab> {
                 subtitle: shiftProvider.errorMessage!,
               ),
             )
-          else ...[
-            ShiftCalendar(
-              focusedDay: _focusedDay,
-              selectedDay: _selectedDay,
-              onDaySelected: (selected, focused) => setState(() {
-                _selectedDay = selected;
-                _focusedDay = focused;
-              }),
-              onPageChanged: (focused) => _focusedDay = focused,
-              eventLoader: shiftProvider.shiftsOn,
-              leaveLoader: leaveProvider.approvedLeavesOn,
-              // Il responsabile lavora giorno per giorno: la vista settimana
-              // (una riga) lascia lo spazio all'elenco. Il mese resta a un
-              // tocco dal pulsante nell'intestazione.
-              startWithWeekView: true,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.xs,
-              ),
-              child: _DayHeader(
-                day: _selectedDay,
-                shifts: selectedShifts,
-                leavesCount: selectedLeaves.length,
-              ),
-            ),
+          else
+            // Calendario, intestazione ed elenco scorrono INSIEME: in vista
+            // mese la griglia è alta il doppio e, se fosse fissa, il resto
+            // verrebbe schiacciato e tagliato dalla zona del FAB.
+            // La sfumatura in fondo evita che le card passando dietro al
+            // pulsante si vedano affettate dal suo bordo.
             Expanded(
-              child: (selectedShifts.isEmpty && selectedLeaves.isEmpty)
-                  // Il padding tiene il messaggio centrato SOPRA il FAB.
-                  ? Padding(
-                      padding: EdgeInsets.only(
-                        bottom: AppSizes.fabClearance + insets.bottom,
+              child: BottomFade(
+                fadeHeight: AppSizes.fabClearance + insets.bottom,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: ShiftCalendar(
+                        focusedDay: _focusedDay,
+                        selectedDay: _selectedDay,
+                        onDaySelected: (selected, focused) => setState(() {
+                          _selectedDay = selected;
+                          _focusedDay = focused;
+                        }),
+                        onPageChanged: (focused) => _focusedDay = focused,
+                        eventLoader: shiftProvider.shiftsOn,
+                        leaveLoader: leaveProvider.approvedLeavesOn,
+                        // Il responsabile lavora giorno per giorno: la vista
+                        // settimana (una riga) lascia lo spazio all'elenco. Il
+                        // mese resta a un tocco dal pulsante nell'intestazione.
+                        startWithWeekView: true,
                       ),
-                      child: PlaceholderView(
-                        icon: Icons.event_busy_rounded,
-                        title: 'Niente in questo giorno',
-                        subtitle:
-                            'Nessun turno o assenza in questa data.',
-                      ),
-                    )
-                  // Prima le assenze (contesto), poi i turni del giorno.
-                  : ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        AppSpacing.sm,
-                        0,
-                        AppSpacing.sm,
-                        AppSizes.fabClearance + insets.bottom,
-                      ),
-                      children: [
-                        // Nome "vivo" dall'anagrafica se c'è; altrimenti quello
-                        // fotografato sul documento (membro rimosso dal locale).
-                        for (final leave in selectedLeaves)
-                          LeaveDayCard(
-                            request: leave,
-                            employeeName:
-                                staffProvider.byUid(leave.employeeUid)?.name ??
-                                (leave.employeeName.isNotEmpty
-                                    ? leave.employeeName
-                                    : 'Dipendente'),
-                          ),
-                        for (final shift in selectedShifts)
-                          _ShiftCard(
-                            shift: shift,
-                            employeeName:
-                                staffProvider.byUid(shift.employeeUid)?.name ??
-                                (shift.employeeName.isNotEmpty
-                                    ? shift.employeeName
-                                    : 'Dipendente'),
-                            // Turno non ancora iniziato di un membro
-                            // disattivato O rimosso dal locale: in entrambi
-                            // i casi va riassegnato.
-                            needsReassign:
-                                shift.startsAfter(now) &&
-                                (staffProvider
-                                        .byUid(shift.employeeUid)
-                                        ?.isDisattivato ??
-                                    true),
-                            onEdit: () => _openForm(existing: shift),
-                            onDelete: () => _confirmDelete(shift),
-                          ),
-                      ],
                     ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.xs,
+                        ),
+                        child: _DayHeader(
+                          day: _selectedDay,
+                          shifts: selectedShifts,
+                          leavesCount: selectedLeaves.length,
+                        ),
+                      ),
+                    ),
+                    if (selectedShifts.isEmpty && selectedLeaves.isEmpty)
+                      // Riempie lo spazio che avanza (e non meno: se il mese è
+                      // aperto lo scroll continua). Il padding tiene il
+                      // messaggio centrato SOPRA il FAB.
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            bottom: AppSizes.fabClearance + insets.bottom,
+                          ),
+                          child: PlaceholderView(
+                            icon: Icons.event_busy_rounded,
+                            title: 'Niente in questo giorno',
+                            subtitle: 'Nessun turno o assenza in questa data.',
+                          ),
+                        ),
+                      )
+                    else
+                      // Prima le assenze (contesto), poi i turni del giorno.
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.sm,
+                          0,
+                          AppSpacing.sm,
+                          AppSizes.fabClearance + insets.bottom,
+                        ),
+                        sliver: SliverList.list(
+                          children: [
+                            // Nome "vivo" dall'anagrafica se c'è; altrimenti
+                            // quello fotografato sul documento (membro rimosso
+                            // dal locale).
+                            for (final leave in selectedLeaves)
+                              LeaveDayCard(
+                                request: leave,
+                                employeeName:
+                                    staffProvider
+                                        .byUid(leave.employeeUid)
+                                        ?.name ??
+                                    (leave.employeeName.isNotEmpty
+                                        ? leave.employeeName
+                                        : 'Dipendente'),
+                              ),
+                            for (final shift in selectedShifts)
+                              _ShiftCard(
+                                shift: shift,
+                                employeeName:
+                                    staffProvider
+                                        .byUid(shift.employeeUid)
+                                        ?.name ??
+                                    (shift.employeeName.isNotEmpty
+                                        ? shift.employeeName
+                                        : 'Dipendente'),
+                                // Turno non ancora iniziato di un membro
+                                // disattivato O rimosso dal locale: in entrambi
+                                // i casi va riassegnato.
+                                needsReassign:
+                                    shift.startsAfter(now) &&
+                                    (staffProvider
+                                            .byUid(shift.employeeUid)
+                                            ?.isDisattivato ??
+                                        true),
+                                onEdit: () => _openForm(existing: shift),
+                                onDelete: () => _confirmDelete(shift),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ],
         ],
       ),
       // Il Padding alza il FAB sopra la NavigationBar trasparente della home

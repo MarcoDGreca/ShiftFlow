@@ -21,9 +21,12 @@ class GlassFormScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra; `bottom`
+    // Con extendBodyBehindAppBar il contenuto parte da sotto la barra: il
+    // padding in alto deve scavalcare sia la status bar (`viewPadding.top`) sia
+    // l'AppBar stessa, altrimenti il primo campo le finisce dietro. `bottom`
     // tiene il pulsante sopra la barra gesti su schermi piccoli.
     final viewPadding = MediaQuery.paddingOf(context);
+    final appBarHeight = viewPadding.top + kToolbarHeight;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -36,7 +39,7 @@ class GlassFormScaffold extends StatelessWidget {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              viewPadding.top + AppSpacing.lg,
+              appBarHeight + AppSpacing.lg,
               AppSpacing.lg,
               viewPadding.bottom + AppSpacing.lg,
             ),

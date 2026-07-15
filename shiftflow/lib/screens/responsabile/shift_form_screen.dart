@@ -354,10 +354,6 @@ class _ShiftFormScreenState extends State<ShiftFormScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SectionHeader(
-              title: 'Turno',
-              padding: EdgeInsets.only(bottom: AppSpacing.sm),
-            ),
             DropdownButtonFormField<String>(
               // La chiave segue il valore: se il membro selezionato sparisce
               // dalle voci, il campo si ricostruisce azzerato invece di
