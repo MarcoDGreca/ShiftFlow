@@ -211,6 +211,17 @@ describe('Richieste: creazione e decisione', () => {
     );
   });
 
+  // Il vincolo sullo stato iniziale chiude l'auto-approvazione via CREATE:
+  // senza di esso un dipendente potrebbe nascere una richiesta già "approvata"
+  // (o con resolvedBy falso), scavalcando la decisione del responsabile.
+  it('un dipendente NON può creare una richiesta già "approvata"', async () => {
+    await assertFails(
+      setDoc(doc(as('empA'), 'restaurants/restA/leaveRequests/reqAppr'),
+        { employeeUid: 'empA', status: 'approvata', type: 'permesso',
+          resolvedBy: 'managerA' }),
+    );
+  });
+
   it('il responsabile può approvare una richiesta in attesa', async () => {
     await assertSucceeds(
       updateDoc(doc(as('managerA'), 'restaurants/restA/leaveRequests/req1'),
@@ -332,6 +343,23 @@ describe('Annullamento richiesta dal dipendente (§7.2)', () => {
     await assertFails(
       updateDoc(doc(as('empA2'), 'restaurants/restA/leaveRequests/req1'),
         { status: 'annullata' }),
+    );
+  });
+
+  // Annullando, l'unico campo che può cambiare è "status": non si può, con la
+  // stessa scrittura, dirottare la richiesta nello storico di un collega...
+  it('il dipendente NON può cambiare employeeUid mentre annulla', async () => {
+    await assertFails(
+      updateDoc(doc(as('empA'), 'restaurants/restA/leaveRequests/req1'),
+        { status: 'annullata', employeeUid: 'empA2' }),
+    );
+  });
+
+  // ...né riscrivere altri campi (es. la motivazione) approfittando dell'annullamento.
+  it('il dipendente NON può modificare altri campi mentre annulla', async () => {
+    await assertFails(
+      updateDoc(doc(as('empA'), 'restaurants/restA/leaveRequests/req1'),
+        { status: 'annullata', reason: 'manomesso' }),
     );
   });
 });

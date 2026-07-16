@@ -83,15 +83,25 @@ service cloud.firestore {
         allow read: if isResponsabile(restaurantId)
                      || (isStaff(restaurantId)
                          && resource.data.employeeUid == request.auth.uid);
+        // Il dipendente crea SOLO richieste "in attesa": lo stato iniziale non è
+        // negoziabile. Senza questo vincolo potrebbe nascere una richiesta già
+        // "approvata" (auto-concessione di ferie/permessi) o con un esito e un
+        // "resolvedBy" falsi, scavalcando la decisione del responsabile (RF6).
         allow create: if isStaff(restaurantId)
-                       && request.resource.data.employeeUid == request.auth.uid;
+                       && request.resource.data.employeeUid == request.auth.uid
+                       && request.resource.data.status == "in_attesa";
         // Il responsabile decide (approva/rifiuta). Il dipendente può SOLO
         // annullare la PROPRIA richiesta, e solo finché è ancora "in attesa".
+        // Nell'annullamento l'UNICO campo che può cambiare è "status": così non
+        // può, con la stessa scrittura, riscrivere employeeUid (spostando la
+        // richiesta nello storico di un collega), motivazione o date.
         allow update: if isResponsabile(restaurantId)
                        || (isStaff(restaurantId)
                            && resource.data.employeeUid == request.auth.uid
                            && resource.data.status == "in_attesa"
-                           && request.resource.data.status == "annullata");
+                           && request.resource.data.status == "annullata"
+                           && request.resource.data.diff(resource.data)
+                                .affectedKeys().hasOnly(["status"]));
       }
     }
   }
