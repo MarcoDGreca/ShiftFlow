@@ -8,7 +8,10 @@ import '../models/shift.dart';
 /// Wrapper Firestore per il locale (`restaurants/{rid}`) e la sua anagrafica
 /// personale (subcollection `staff`).
 class RestaurantService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  RestaurantService([FirebaseFirestore? db])
+      : _db = db ?? FirebaseFirestore.instance;
+
+  final FirebaseFirestore _db;
 
   /// Riferimento alla subcollection staff di un locale.
   CollectionReference<Map<String, dynamic>> _staffRef(String restaurantId) =>

@@ -19,7 +19,10 @@ class LeaveRequestException implements Exception {
 /// Wrapper Firestore per le richieste di permesso/cambio turno
 /// (`restaurants/{rid}/leaveRequests`).
 class LeaveRequestService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  LeaveRequestService([FirebaseFirestore? db])
+      : _db = db ?? FirebaseFirestore.instance;
+
+  final FirebaseFirestore _db;
 
   CollectionReference<Map<String, dynamic>> _ref(String restaurantId) => _db
       .collection(FirestoreCollections.restaurants)
@@ -36,6 +39,17 @@ class LeaveRequestService {
       .doc(restaurantId)
       .collection(FirestoreCollections.shifts)
       .doc(shiftId);
+
+  /// Riferimento all'anagrafica di un membro (serve a leggere il nome VIVO
+  /// al momento della riassegnazione, RF6).
+  DocumentReference<Map<String, dynamic>> _staffRef(
+    String restaurantId,
+    String uid,
+  ) => _db
+      .collection(FirestoreCollections.restaurants)
+      .doc(restaurantId)
+      .collection(FirestoreCollections.staff)
+      .doc(uid);
 
   /// Ordina: prima le richieste "in attesa" (sono quelle su cui agire), poi
   /// per data di invio decrescente (più recenti in alto). Fatto in memoria per
@@ -129,6 +143,19 @@ class LeaveRequestService {
         shiftSnap = await tx.get(shiftRef);
       }
 
+      // Il nome da scrivere sul turno riassegnato deve essere quello VIVO
+      // dell'anagrafica, non quello (potenzialmente scaduto) passato dalla UI;
+      // si ripiega su quest'ultimo solo se il documento staff non esiste più.
+      String? reassignName = reassignToName;
+      if (touchesShift &&
+          shiftResolution == ShiftResolution.reassign &&
+          reassignToUid != null) {
+        final staffSnap = await tx.get(_staffRef(restaurantId, reassignToUid));
+        if (staffSnap.exists) {
+          reassignName = staffSnap.data()?['name'] as String? ?? reassignName;
+        }
+      }
+
       // --- Scritture. ---
       tx.update(reqRef, {
         'status': approved ? LeaveStatus.approvata : LeaveStatus.rifiutata,
@@ -148,7 +175,7 @@ class LeaveRequestService {
                 // Aggiorniamo anche il nome denormalizzato: deve seguire
                 // il nuovo assegnatario, non restare quello vecchio.
                 // Il `?` salta la voce se il nome è null.
-                'employeeName': ?reassignToName,
+                'employeeName': ?reassignName,
               });
             }
           case ShiftResolution.keep:

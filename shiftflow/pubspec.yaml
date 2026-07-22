@@ -1,5 +1,5 @@
 name: shiftflow
-description: "A new Flutter project."
+description: "ShiftFlow — gestione turni e richieste di permesso per ristoranti indipendenti. App Flutter multipiattaforma su backend Firebase."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -45,6 +45,12 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # Fake in memoria di Cloud Firestore (supporta transazioni e batch): permette
+  # di testare la logica dei Service senza emulatore né rete. Solo dev/test.
+  # Se `pub get` segnala un conflitto di versione con cloud_firestore, rigenera
+  # il vincolo con: flutter pub add dev:fake_cloud_firestore
+  fake_cloud_firestore: ^4.0.0
 
   # Generano rispettivamente le icone launcher e la splash screen nativa
   # a partire dai PNG in assets/icon/ (vedi config in fondo al file).
